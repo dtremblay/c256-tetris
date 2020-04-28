@@ -110,6 +110,10 @@ SOF_INTERRUPT
                 BNE SKIP_SOF 
                 JSR DISPLAY_BOARD
     SKIP_SOF
+                CMP #3
+                BNE SOF_DONE
+                JSR REMOVE_LINES
+    SOF_DONE
                 RTS
 
                 

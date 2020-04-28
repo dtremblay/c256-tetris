@@ -2,14 +2,17 @@
 <!--Export of Watch List for C256 Foenix IDE-->
 <watches>
 	<watch address="000017" label="CURSORPOS" />
+	<watch address="000060" label="DEL_LINE_PTR" />
 	<watch address="000062" label="ROT_VAL" />
 	<watch address="000063" label="ROT_VAL2" />
-	<watch address="16007C" label="BOARDX" />
-	<watch address="16007D" label="BOARDY" />
-	<watch address="160083" label="TICK_COUNT" />
-	<watch address="160087" label="SCORE" />
+	<watch address="000064" label="LINE_CNTR" />
 	<watch address="160088" label="CURRENT_PIECE" />
-	<watch address="160089" label="PIECE_X" />
-	<watch address="16008B" label="PIECE_Y" />
-	<watch address="16008D" label="PIECE_ROT" />
+	<watch address="16008A" label="TICK_COUNT" />
+	<watch address="16008D" label="BOARDX" />
+	<watch address="16008E" label="BOARDY" />
+	<watch address="160090" label="PIECE_X" />
+	<watch address="160092" label="PIECE_Y" />
+	<watch address="160098" label="SCORE" />
+	<watch address="16009B" label="GAME_STATE" />
+	<watch address="16009C" label="LEVEL" />
 </watches>

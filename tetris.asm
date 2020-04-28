@@ -30,21 +30,20 @@ PIECE_FIT       .byte 0
 GAME_SPEED      .byte 50 ; how many ticks beteen bars falling
 PIECE_CNTR      .byte 0  ; we increase the speed of the game for every 10 pieces
 SCORE           .long 0  ; decimal formatted score
-GAME_STATE      .byte 0  ; 0 - running, 1 - game over
+GAME_STATE      .byte 0  ; 0 - running, 1 - game over, 2 - restarting, 3 - display line bonus
 LEVEL           .byte 1
 
 BOARD_WIDTH     = 14
 BOARD_HEIGHT    = 21
 START_BOARD     = $A900 + (72-BOARD_WIDTH)/2
-PIECE_VALUE     = 25
+PIECE_VALUE     = $25  ; we're doing BCD additions
 LINE_VALUE      = 100
 MSG_ADDR        = $60
 ROT_VAL         = $62
 ROT_VAL2        = $63
-
-HEX_VALUES      .text '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'
-GAME_OVER_MSG   .text 'GAME OVER',0
-SCORE_MSG       .text 'SCORE:',0
+LINE_CNTR       = $64
+DEL_LINE_PTR    = $60
+COPY_LINE_PTR   = $66
                 
 GAME_START      
                 setas
@@ -120,10 +119,12 @@ DISPLAY_BOARD
                 ; set the piece in place
                 JSR COPY_PIECE
                 setal
+                SED
                 CLC
                 LDA SCORE
                 ADC #PIECE_VALUE
                 STA SCORE
+                CLD
                 setas
                 BCC NG_CONTINUE
                 ; increment the hi-byte
@@ -140,6 +141,7 @@ DISPLAY_BOARD
                 STA PIECE_Y
                 STA PIECE_FIT
                 STA PIECE_ROT
+                STA TICK_COUNT
                 
                 JSR PICK_NEXT_PIECE
                 LDA PIECE_CNTR
@@ -161,6 +163,11 @@ DISPLAY_BOARD
                 JSR DRAW_LEVEL
                 
                 RTS
+                
+    WAIT_LINES
+                ; display bonus 1: 100, 2: 300, 3: 600, 4: 1000
+                
+                
                 
 PICK_NEXT_PIECE
                 .as
@@ -193,6 +200,7 @@ INVALID_KEY
 LOOK_FOR_LINES
                 .as
                 STZ ROT_VAL2 ; line count max 4
+                STZ LINE_CNTR
     INIT_LINE_CHECK
                 LDY #0
                 STZ ROT_VAL  ; column count max 10
@@ -232,6 +240,9 @@ LOOK_FOR_LINES
                 RTS
                 
     LINE_FOUND
+                INC LINE_CNTR
+                LDA #3
+                STA GAME_STATE
                 setal
                 LDA PIECE_Y
                 STA UNSIGNED_MULT_A
@@ -677,6 +688,94 @@ DRAW_SCORE
                 
 DRAW_LEVEL
                 .as
+                LDY #$A000 + 128*7 + 56
+                STY CURSORPOS
+                LDA #$20
+                STA CURCOLOR
+                
+                LDY #<>LEVEL_MSG
+                STY MSG_ADDR
+                JSR DISPLAY_MSG
+                
+                INC CURSORPOS
+                LDA LEVEL
+                JSR DISPLAY_HEX
+                
+                RTS
+                
+; *******************************************************************
+; * This routine will display the "BONUS" for 50 ticks and 
+; * then delete the lines.
+; *******************************************************************
+REMOVE_LINES
+                .as
+                LDA TICK_COUNT
+                INC A
+                STA TICK_COUNT
+                CMP #1
+                BNE WAIT_FOR_50
+                
+                LDY #$A000 + 128*11 + 56
+                STY CURSORPOS
+                LDA #$20
+                STA CURCOLOR
+                
+                LDY #<>BONUS_MSG
+                STY MSG_ADDR
+                JSR DISPLAY_MSG
+                
+                INC CURSORPOS
+                
+                
+                LDX LINE_CNTR
+                LDA BONUS,X
+                JSR DISPLAY_HEX
+                LDA #0
+                JSR DISPLAY_HEX
+                BRA SKIP_DELETE_LINES
+    WAIT_FOR_50
+                CMP #50
+                BNE SKIP_DELETE_LINES
+                ; delete the bonus line
+                LDY #$A000 + 128*11 + 56
+                STY CURSORPOS
+                LDA #0
+                LDY #0
+        CLEAR_BONUS_LP
+                STA [CURSORPOS],Y
+                INY
+                CPY #16
+                BNE CLEAR_BONUS_LP
+                
+                ; add the bonus to the score
+                LDX LINE_CNTR
+                LDA BONUS,X
+                XBA
+                LDA #0
+                setal
+                SED
+                CLC 
+                ADC SCORE
+                STA SCORE
+                CLD
+                setas
+                
+                BCC BONUS_CONTINUE
+                ; increment the hi-byte
+                LDA SCORE+2
+                INC A
+                STA SCORE+2
+        BONUS_CONTINUE
+        
+                ; delete the lines
+                JSR DELETE_LINES
+                
+                ; reset the game state
+                LDA #0
+                STA TICK_COUNT
+                STA GAME_STATE
+                
+    SKIP_DELETE_LINES
                 RTS
                 
 DISPLAY_MSG
@@ -717,6 +816,22 @@ GAME_OVER
                 JSR DISPLAY_MSG
                 
                 ; display SCORE
+                LDY #$A000 + 128*27 + 29
+                STY CURSORPOS
+                LDA #$20
+                STA CURCOLOR
+                
+                LDY #<>SCORE_MSG
+                STY MSG_ADDR
+                JSR DISPLAY_MSG
+                
+                INC CURSORPOS
+                LDA SCORE + 2
+                JSR DISPLAY_HEX
+                LDA SCORE + 1
+                JSR DISPLAY_HEX
+                LDA SCORE
+                JSR DISPLAY_HEX
                 
                 ; clear the board
                 LDA #0
@@ -776,6 +891,56 @@ DISPLAY_HEX
                 RTS
 
 ; *****************************************************************************
+; * Delete the full lines - start from the bottom of the board.
+; *****************************************************************************
+DELETE_LINES
+                .as
+                setal
+                LDA #0
+                XBA
+                LDA LINE_CNTR
+                BEQ DELETE_LINES_DONE
+                
+                ; find the deleted lines
+                LDA #BOARD_WIDTH * (BOARD_HEIGHT-2)
+        LOOK_UP
+                STA BYTE_CNTR
+                
+        CHECK_NEXT
+                TAX
+                INX
+                INX
+                
+                LDA @lBOARD,X
+                CMP #'=='
+                BNE DONT_DELETE
+                
+                LDA #<>BOARD
+                CLC
+                ADC BYTE_CNTR
+                TAX
+                ADC #BOARD_WIDTH
+                TAY
+                LDA BYTE_CNTR
+                MVP `BOARD,`BOARD
+
+                LDA BYTE_CNTR
+                DEC LINE_CNTR
+                BNE CHECK_NEXT
+                
+                BRA DELETE_LINES_DONE
+                
+        DONT_DELETE
+                LDA BYTE_CNTR
+                SEC
+                SBC #BOARD_WIDTH
+                BRA LOOK_UP
+                
+    DELETE_LINES_DONE
+                setas
+                RTS
+
+; *****************************************************************************
 ; * INIT GAME
 ; *****************************************************************************
 INIT_GAME
@@ -814,6 +979,14 @@ INIT_GAME
 ; *****************************************************************************
 ; * variables
 ; *****************************************************************************
+HEX_VALUES      .text '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'
+BONUS           .text 0,1,3,6,$10
+GAME_OVER_MSG   .text 'GAME OVER',0
+SCORE_MSG       .text 'SCORE:',0
+LEVEL_MSG       .text 'LEVEL:',0
+BONUS_MSG       .text 'BONUS:  ',0
+BYTE_CNTR       .word 0
+
 BOARD
 .rept BOARD_HEIGHT - 1
     .byte '#'
