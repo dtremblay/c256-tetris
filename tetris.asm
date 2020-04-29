@@ -27,12 +27,13 @@ PIECE_X         .word 6
 PIECE_Y         .word 0
 PIECE_ROT       .byte 0
 PIECE_FIT       .byte 0
-GAME_SPEED      .byte 50 ; how many ticks beteen bars falling
+GAME_SPEED      .byte 0 ; how many ticks beteen bars falling
 PIECE_CNTR      .byte 0  ; we increase the speed of the game for every 10 pieces
-SCORE           .long 0  ; decimal formatted score
+SCORE           .fill 4, 0  ; decimal formatted score
 GAME_STATE      .byte 0  ; 0 - running, 1 - game over, 2 - restarting, 3 - display line bonus
 LEVEL           .byte 1
 
+INITIAL_GAME_SPEED = 40
 BOARD_WIDTH     = 14
 BOARD_HEIGHT    = 21
 START_BOARD     = $A900 + (72-BOARD_WIDTH)/2
@@ -85,6 +86,7 @@ GAME_START
                 LDA GAME_STATE
                 CMP #2
                 BEQ GAME_START
+                
                 BRA INFINITE_LOOP
                 
 DISPLAY_BOARD   
@@ -93,7 +95,7 @@ DISPLAY_BOARD
                 LDA TICK_COUNT
                 INC A
                 STA TICK_COUNT
-                CMP #50
+                CMP GAME_SPEED
                 BNE TIMING_DONE
                 
                 LDA PIECE_Y
@@ -110,11 +112,9 @@ DISPLAY_BOARD
                 
                 ; if Y position is 0, then game over
                 LDA PIECE_Y
-                DEC A
-                STA PIECE_Y
                 BNE NOT_GAME_OVER
-                
                 JMP GAME_OVER
+                
         NOT_GAME_OVER
                 ; set the piece in place
                 JSR COPY_PIECE
@@ -150,11 +150,19 @@ DISPLAY_BOARD
                 CMP #10
                 BNE LOGIC_DONE
                 
+                ; increase difficulty level and game speed
                 LDA #0
                 STA PIECE_CNTR
+                SED
+                CLC
                 LDA LEVEL
-                INC A
+                ADC #1
                 STA LEVEL
+                CLD
+                LDA GAME_SPEED
+                SEC
+                SBC #2
+                STA GAME_SPEED
                 
     LOGIC_DONE
                 JSR DRAW_BOARD
@@ -163,9 +171,6 @@ DISPLAY_BOARD
                 JSR DRAW_LEVEL
                 
                 RTS
-                
-    WAIT_LINES
-                ; display bonus 1: 100, 2: 300, 3: 600, 4: 1000
                 
                 
                 
@@ -435,6 +440,7 @@ ROTATE_PIECE
                 LDA GAME_STATE
                 CMP #1 ; user pressed the space bar to restart the game
                 BNE ROT_START
+                
                 LDA #2
                 STA GAME_STATE
                 RTS
@@ -463,6 +469,7 @@ COPY_PIECE
                 
                 setal
                 LDA PIECE_Y
+                DEC A
                 STA UNSIGNED_MULT_A
                 LDA #BOARD_WIDTH
                 STA UNSIGNED_MULT_B
@@ -726,7 +733,6 @@ REMOVE_LINES
                 
                 INC CURSORPOS
                 
-                
                 LDX LINE_CNTR
                 LDA BONUS,X
                 JSR DISPLAY_HEX
@@ -736,6 +742,7 @@ REMOVE_LINES
     WAIT_FOR_50
                 CMP #50
                 BNE SKIP_DELETE_LINES
+                
                 ; delete the bonus line
                 LDY #$A000 + 128*11 + 56
                 STY CURSORPOS
@@ -750,23 +757,24 @@ REMOVE_LINES
                 ; add the bonus to the score
                 LDX LINE_CNTR
                 LDA BONUS,X
-                XBA
+                XBA ; multiply by 256
                 LDA #0
                 setal
                 SED
                 CLC 
                 ADC SCORE
                 STA SCORE
-                CLD
                 setas
                 
                 BCC BONUS_CONTINUE
                 ; increment the hi-byte
                 LDA SCORE+2
-                INC A
+                CLC
+                ADC #1
+                
                 STA SCORE+2
         BONUS_CONTINUE
-        
+                CLD
                 ; delete the lines
                 JSR DELETE_LINES
                 
@@ -895,10 +903,11 @@ DISPLAY_HEX
 ; *****************************************************************************
 DELETE_LINES
                 .as
+                PHB
                 setal
-                LDA #0
-                XBA
                 LDA LINE_CNTR
+                AND #$F
+                ; if 0 then there are no lines to delete and we shouldn't have gotten here
                 BEQ DELETE_LINES_DONE
                 
                 ; find the deleted lines
@@ -922,10 +931,12 @@ DELETE_LINES
                 ADC #BOARD_WIDTH
                 TAY
                 LDA BYTE_CNTR
+                DEC A
                 MVP `BOARD,`BOARD
 
-                LDA BYTE_CNTR
-                DEC LINE_CNTR
+                LDA LINE_CNTR
+                DEC A
+                STA LINE_CNTR
                 BNE CHECK_NEXT
                 
                 BRA DELETE_LINES_DONE
@@ -938,6 +949,7 @@ DELETE_LINES
                 
     DELETE_LINES_DONE
                 setas
+                PLB
                 RTS
 
 ; *****************************************************************************
@@ -945,7 +957,7 @@ DELETE_LINES
 ; *****************************************************************************
 INIT_GAME
                 .as
-                LDA #50
+                LDA #INITIAL_GAME_SPEED
                 STA GAME_SPEED
                 LDA #0       ;Set Cursor Disabled
                 STA VKY_TXT_CURSOR_CTRL_REG

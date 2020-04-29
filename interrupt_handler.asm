@@ -109,6 +109,7 @@ SOF_INTERRUPT
                 LDA GAME_STATE  ; The SOF is still getting called, even when masked
                 BNE SKIP_SOF 
                 JSR DISPLAY_BOARD
+                BRA SOF_DONE
     SKIP_SOF
                 CMP #3
                 BNE SOF_DONE
