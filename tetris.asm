@@ -40,11 +40,12 @@ START_BOARD     = $A900 + (72-BOARD_WIDTH)/2
 PIECE_VALUE     = $25  ; we're doing BCD additions
 LINE_VALUE      = 100
 MSG_ADDR        = $60
+DEL_LINE_PTR    = $60
 ROT_VAL         = $62
 ROT_VAL2        = $63
 LINE_CNTR       = $64
-DEL_LINE_PTR    = $60
 COPY_LINE_PTR   = $66
+TOTAL_LINES     = $68
                 
 GAME_START      
                 setas
@@ -169,6 +170,7 @@ DISPLAY_BOARD
                 JSR DRAW_PIECE
                 JSR DRAW_SCORE
                 JSR DRAW_LEVEL
+                JSR DRAW_LINES
                 
                 RTS
                 
@@ -704,8 +706,30 @@ DRAW_LEVEL
                 STY MSG_ADDR
                 JSR DISPLAY_MSG
                 
-                INC CURSORPOS
+                CLC
+                LDA CURSORPOS
+                ADC #5
+                STA CURSORPOS
                 LDA LEVEL
+                JSR DISPLAY_HEX
+                
+                RTS
+                
+DRAW_LINES
+                .as
+                LDY #$A000 + 128*13 + 56
+                STY CURSORPOS
+                LDA #$20
+                STA CURCOLOR
+                
+                LDY #<>LINES_MSG
+                STY MSG_ADDR
+                JSR DISPLAY_MSG
+                
+                INC CURSORPOS
+                LDA TOTAL_LINES+1
+                JSR DISPLAY_HEX
+                LDA TOTAL_LINES
                 JSR DISPLAY_HEX
                 
                 RTS
@@ -764,6 +788,12 @@ REMOVE_LINES
                 CLC 
                 ADC SCORE
                 STA SCORE
+                
+                ; calculate the number of total lines
+                LDA LINE_CNTR
+                CLC
+                ADC TOTAL_LINES
+                STA TOTAL_LINES
                 setas
                 
                 BCC BONUS_CONTINUE
@@ -796,8 +826,12 @@ DISPLAY_MSG
                 LDA (MSG_ADDR)
                 BEQ MSG_DONE
                 JSR DISPLAY_SYMBOL
-                INC CURSORPOS
-                INC MSG_ADDR
+                LDX CURSORPOS
+                INX
+                STX CURSORPOS
+                LDX MSG_ADDR
+                INX
+                STX MSG_ADDR
                 BRA MSG_LOOP
                 
     MSG_DONE    PLB
@@ -968,6 +1002,8 @@ INIT_GAME
                 STA SCORE
                 STA SCORE + 1
                 STA SCORE + 2
+                STA TOTAL_LINES
+                STA TOTAL_LINES + 1
                 LDA #1
                 STA LEVEL
                 
@@ -997,6 +1033,7 @@ GAME_OVER_MSG   .text 'GAME OVER',0
 SCORE_MSG       .text 'SCORE:',0
 LEVEL_MSG       .text 'LEVEL:',0
 BONUS_MSG       .text 'BONUS:  ',0
+LINES_MSG       .text 'LINES:  ',0
 BYTE_CNTR       .word 0
 
 BOARD
