@@ -36,7 +36,8 @@ LEVEL           .byte 1
 INITIAL_GAME_SPEED = 40
 BOARD_WIDTH     = 14
 BOARD_HEIGHT    = 21
-START_BOARD     = $A900 + (72-BOARD_WIDTH)/2
+START_BOARD     = $5000 + $40 * 5 + (40-BOARD_WIDTH)/2
+START_BOARD_T   = $A000 + $900 + (72-BOARD_WIDTH)/2
 PIECE_VALUE     = $25  ; we're doing BCD additions
 LINE_VALUE      = 100
 MSG_ADDR        = $60
@@ -261,13 +262,19 @@ LOOK_FOR_LINES
                 INX
                 INX ; skip the first two columns
                 LDY #0
-                LDA #'='
+                LDA #9
+                STA BOARD,X
+                INX
+                INY
+                LDA #10
         LINE_CHAR
                 STA BOARD,X
                 INX
                 INY
-                CPY #BOARD_WIDTH-4
+                CPY #BOARD_WIDTH-5
                 BNE LINE_CHAR
+                LDA #11
+                STA BOARD,X
                 
                 BRA CHK_NEXT_LINE
 
@@ -492,7 +499,7 @@ COPY_PIECE
                 TYX
                 CLC
                 LDA CURRENT_PIECE
-                ADC #65
+                ADC #2
                 STA BOARD,X
                 PLX
                 
@@ -580,16 +587,60 @@ DOES_PIECE_FIT
                 STA PIECE_FIT
     PF_DONE
                 RTS
+                
+; draw the board as tiles
+DRAW_BOARD
+                .as
+                .xl
+                LDX #START_BOARD
+                STX CURSORPOS
+                
+                LDX #0
+                LDA #0
+                STA BOARDY
+    NEXT_ROW
+                LDA #0
+                STA BOARDX
+        NEXT_SYMBOL
+                LDA BOARD,X
+                CMP #'#'
+                BNE SKIP_DR_BRD
+                LDA #1
+                BRA DISPLAY_BLOCK
+                
+            SKIP_DR_BRD
+                ;LDA #0
+            DISPLAY_BLOCK
+                STA [CURSORPOS]
+                INX 
+                INC CURSORPOS
+                LDA BOARDX
+                INC A
+                STA BOARDX
+                CMP #BOARD_WIDTH
+                BNE NEXT_SYMBOL
+                
+                setal
+                LDA CURSORPOS
+                CLC
+                ADC #$40-BOARD_WIDTH
+                STA CURSORPOS
+                setas
+                LDA BOARDY
+                INC A
+                STA BOARDY
+                CMP #BOARD_HEIGHT
+                BNE NEXT_ROW
+                RTS
+
 DRAW_PIECE
                 .as
-                LDA #$63
-                STA CURCOLOR
                 setal
                 LDA #START_BOARD
                 CLC
                 ADC PIECE_X
                 STA CURSORPOS
-                LDA #128
+                LDA #64
                 STA UNSIGNED_MULT_A
                 LDA PIECE_Y
                 STA UNSIGNED_MULT_B
@@ -615,8 +666,9 @@ DRAW_PIECE
                 
                 LDA CURRENT_PIECE
                 CLC
-                ADC #65
-                JSR DISPLAY_SYMBOL
+                ADC #2
+                STA [CURSORPOS]
+                
         SKIP_DRAW
                 INX
                 INC CURSORPOS
@@ -627,51 +679,13 @@ DRAW_PIECE
                 setal
                 LDA CURSORPOS
                 CLC
-                ADC #124
+                ADC #$40-4
                 STA CURSORPOS
                 TXA
                 AND #$F
                 setas
                 BNE NEXT_PIECE_SYMBOL
                 
-                RTS
-; draw the board
-DRAW_BOARD
-                .as
-                .xl
-                LDA #$40
-                STA CURCOLOR
-                LDX #START_BOARD
-                STX CURSORPOS
-                
-                LDX #0
-                LDA #0
-                STA BOARDY
-    NEXT_ROW
-                LDA #0
-                STA BOARDX
-        NEXT_SYMBOL
-                LDA BOARD,X
-                JSR DISPLAY_SYMBOL
-                INX 
-                INC CURSORPOS
-                LDA BOARDX
-                INC A
-                STA BOARDX
-                CMP #BOARD_WIDTH
-                BNE NEXT_SYMBOL
-                
-                setal
-                LDA CURSORPOS
-                CLC
-                ADC #128-BOARD_WIDTH
-                STA CURSORPOS
-                setas
-                LDA BOARDY
-                INC A
-                STA BOARDY
-                CMP #BOARD_HEIGHT
-                BNE NEXT_ROW
                 RTS
                 
 DRAW_SCORE
@@ -746,6 +760,7 @@ REMOVE_LINES
                 CMP #1
                 BNE WAIT_FOR_50
                 
+                ; display bonus message
                 LDY #$A000 + 128*11 + 56
                 STY CURSORPOS
                 LDA #$20
@@ -955,7 +970,7 @@ DELETE_LINES
                 INX
                 
                 LDA @lBOARD,X
-                CMP #'=='
+                CMP #$A09
                 BNE DONT_DELETE
                 
                 LDA #<>BOARD
@@ -991,6 +1006,27 @@ DELETE_LINES
 ; *****************************************************************************
 INIT_GAME
                 .as
+                ; set the display mode to tiles
+                LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
+                STA MASTER_CTRL_REG_L
+                ; enable tile layer 0
+                LDA #$81
+                STA TL0_CONTROL_REG
+                
+                ; load tiles
+                setal
+                LDA #$1000
+                LDX #<>TILES
+                LDY #0
+                MVN `TILES,$B0
+                
+                ; load palette
+                LDA #$400
+                LDX #<>PALETTE
+                LDY #<>GRPH_LUT0_PTR
+                MVN #`PALETTE,#`GRPH_LUT0_PTR
+                setas
+                
                 LDA #INITIAL_GAME_SPEED
                 STA GAME_SPEED
                 LDA #0       ;Set Cursor Disabled
@@ -1022,6 +1058,16 @@ INIT_GAME
                 STA @lINT_MASK_REG2
                 STA @lINT_MASK_REG3
                 
+                ; clear the tileset
+                LDX #$5000
+                STX CURSORPOS
+                LDA #0
+                LDY #0
+        CLEAR_TS_LOOP
+                STA [CURSORPOS],Y
+                INY
+                CPY #$800
+                BNE CLEAR_TS_LOOP
                 RTS
                 
 ; *****************************************************************************
@@ -1091,3 +1137,7 @@ PIECE6
     .byte 0,1,1,0
     .byte 0,0,1,0
     .byte 0,0,0,0
+TILES
+.binary "tetris-tiles.data"
+PALETTE
+.binary "tetris-tiles.data.pal"
