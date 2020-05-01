@@ -864,7 +864,7 @@ GAME_OVER
                 JSL CLRSCREEN
                 LDY #$A000 + 128*26 + 31
                 STY CURSORPOS
-                LDA #$20
+                LDA #$23
                 STA CURCOLOR
                 ; display GAME OVER
                 LDY #<>GAME_OVER_MSG
@@ -1006,26 +1006,70 @@ DELETE_LINES
 ; *****************************************************************************
 INIT_GAME
                 .as
-                ; set the display mode to tiles
-                LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
+                PHB
+                ; disable graphics to start with
+                LDA #Mstr_Ctrl_Disable_Vid
                 STA MASTER_CTRL_REG_L
-                ; enable tile layer 0
-                LDA #$81
-                STA TL0_CONTROL_REG
+                
+                setal
+                ; load tile palette
+                LDA #$400
+                LDX #<>PALETTE
+                LDY #<>GRPH_LUT1_PTR
+                MVN #`PALETTE,#`GRPH_LUT1_PTR
+                
+                ; load background palette
+                LDA #$400
+                LDX #<>BACKGROUND_PAL
+                LDY #<>GRPH_LUT0_PTR
+                MVN #`PALETTE,#`GRPH_LUT0_PTR
+                
+                ; load background image - need 4 x 64k moves
+                LDA #$FFFF
+                LDX #<>BACKGROUND
+                LDY #$0
+                MVN `BACKGROUND,$B1
+                LDA #$FFFF
+                LDX #<>BACKGROUND
+                LDY #0
+                MVN `BACKGROUND+$10000,$B2
+                LDA #$FFFF
+                LDX #<>BACKGROUND
+                LDY #0
+                MVN `BACKGROUND+$20000,$B3
+                
+                LDA #$FFFF
+                LDX #<>BACKGROUND
+                LDY #0
+                MVN `BACKGROUND+$30000,$B4
+                
+                LDA #$AFFF
+                LDX #<>BACKGROUND
+                LDY #0
+                MVN `BACKGROUND+$40000,$B5
                 
                 ; load tiles
-                setal
                 LDA #$1000
                 LDX #<>TILES
                 LDY #0
                 MVN `TILES,$B0
                 
-                ; load palette
-                LDA #$400
-                LDX #<>PALETTE
-                LDY #<>GRPH_LUT0_PTR
-                MVN #`PALETTE,#`GRPH_LUT0_PTR
+                ; set the width and height of the bitmap
+                LDA #640
+                STA BM_X_SIZE_L
+                LDA #480
+                STA BM_Y_SIZE_L
                 setas
+                PLB ; MVN operations set the bank - so we need to reset
+                
+                ; enable tile layer 0
+                LDA #$83 ; we're using a 256 stride
+                STA TL0_CONTROL_REG
+                
+                LDA #$1  ; enable bitmap with LUT 2
+                STA BM_CONTROL_REG
+                STA BM_START_ADDY_H ; start at $b1:0000
+                
                 
                 LDA #INITIAL_GAME_SPEED
                 STA GAME_SPEED
@@ -1068,6 +1112,11 @@ INIT_GAME
                 INY
                 CPY #$800
                 BNE CLEAR_TS_LOOP
+                
+                ; set the display mode to tiles
+                LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
+                STA MASTER_CTRL_REG_L
+                
                 RTS
                 
 ; *****************************************************************************
@@ -1139,5 +1188,11 @@ PIECE6
     .byte 0,0,0,0
 TILES
 .binary "tetris-tiles.data"
+BACKGROUND_PAL
+.binary "background.data.pal"
 PALETTE
 .binary "tetris-tiles.data.pal"
+* = $170000
+BACKGROUND
+.binary "background.data"
+
