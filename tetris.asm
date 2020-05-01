@@ -53,7 +53,7 @@ GAME_START
                 setxl
                 LDA #0
                 STA KEYBOARD_SC_FLG 
-                JSR INIT_GAME
+                
                 setal
                 JSL INITSUPERIO
                 LDA #6
@@ -61,9 +61,12 @@ GAME_START
                 STA PIECE_X
                 JSL INITKEYBOARD
                 setas
+                JSR LOAD_GAME_ASSETS
                 
                 LDA #0
                 STA KEYBOARD_SC_FLG 
+    NEXT_GAME
+                JSR INIT_GAME
                 JSL CLRSCREEN
                 
                 ; Enable SOF
@@ -87,7 +90,7 @@ GAME_START
                 NOP
                 LDA GAME_STATE
                 CMP #2
-                BEQ GAME_START
+                BEQ NEXT_GAME
                 
                 BRA INFINITE_LOOP
                 
@@ -1001,10 +1004,7 @@ DELETE_LINES
                 PLB
                 RTS
 
-; *****************************************************************************
-; * INIT GAME
-; *****************************************************************************
-INIT_GAME
+LOAD_GAME_ASSETS
                 .as
                 PHB
                 ; disable graphics to start with
@@ -1070,7 +1070,16 @@ INIT_GAME
                 STA BM_CONTROL_REG
                 STA BM_START_ADDY_H ; start at $b1:0000
                 
+                ; set the display mode to tiles
+                LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
+                STA MASTER_CTRL_REG_L
                 
+                RTS
+; *****************************************************************************
+; * INIT GAME
+; *****************************************************************************
+INIT_GAME
+                .as
                 LDA #INITIAL_GAME_SPEED
                 STA GAME_SPEED
                 LDA #0       ;Set Cursor Disabled
@@ -1084,6 +1093,10 @@ INIT_GAME
                 STA SCORE + 2
                 STA TOTAL_LINES
                 STA TOTAL_LINES + 1
+                ; set border color to 0
+                STA BORDER_COLOR_B
+                STA BORDER_COLOR_G
+                STA BORDER_COLOR_R
                 LDA #1
                 STA LEVEL
                 
@@ -1112,10 +1125,6 @@ INIT_GAME
                 INY
                 CPY #$800
                 BNE CLEAR_TS_LOOP
-                
-                ; set the display mode to tiles
-                LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
-                STA MASTER_CTRL_REG_L
                 
                 RTS
                 
