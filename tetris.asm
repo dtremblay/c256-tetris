@@ -94,7 +94,7 @@ GAME_START
                 
                 BRA INFINITE_LOOP
                 
-DISPLAY_BOARD   
+DISPLAY_BOARD_LOOP
                 .as
                 ; TIMING
                 LDA TICK_COUNT
@@ -217,6 +217,7 @@ LOOK_FOR_LINES
                 STZ ROT_VAL  ; column count max 10
                 setal
                 LDA PIECE_Y
+                DEC A
                 STA UNSIGNED_MULT_A
                 LDA #BOARD_WIDTH
                 STA UNSIGNED_MULT_B
@@ -242,7 +243,7 @@ LOOK_FOR_LINES
                 LDA PIECE_Y
                 INC A
                 STA PIECE_Y
-                CMP #BOARD_HEIGHT-1
+                CMP #BOARD_HEIGHT
                 BEQ LOOK_LINE_DONE
                 LDA ROT_VAL2
                 CMP #4
@@ -256,6 +257,7 @@ LOOK_FOR_LINES
                 STA GAME_STATE
                 setal
                 LDA PIECE_Y
+                DEC A
                 STA UNSIGNED_MULT_A
                 LDA #BOARD_WIDTH
                 STA UNSIGNED_MULT_B
@@ -435,13 +437,23 @@ MOVE_PIECE_DOWN
                 .as
                 LDA GAME_STATE
                 CMP #1 ; user pressed the space bar to restart the game
-                BEQ DOWN_DONE
+                BEQ MOVE_DOWN_DONE
                 
                 LDA PIECE_Y
                 INC A
                 STA PIECE_Y
                 
-    DOWN_DONE
+                JSR DOES_PIECE_FIT
+                LDA PIECE_FIT
+                BEQ MOVE_DOWN_DONE
+                
+                LDA PIECE_Y
+                DEC A
+                STA PIECE_Y
+                LDA #0
+                STA PIECE_FIT
+                
+    MOVE_DOWN_DONE
                 RTS
 
 ; *****************************************************************************
@@ -461,10 +473,29 @@ ROTATE_PIECE
                 LDA PIECE_ROT
                 INC A
                 CMP #4
-                BNE ROTATE_DONE
+                BNE ROTATE_CHECK_COLLISION
                 LDA #0
-    ROTATE_DONE
+    ROTATE_CHECK_COLLISION
                 STA PIECE_ROT
+                JSR DOES_PIECE_FIT
+                LDA PIECE_FIT
+                BEQ ROTATE_DONE
+                
+                LDA #0
+                STA PIECE_FIT
+                
+                ; collision detected
+                LDA PIECE_ROT
+                BEQ ROTATE_3
+                DEC A
+                BRA UNDO_ROT_COLISION
+                
+    ROTATE_3
+                LDA #3
+    UNDO_ROT_COLISION
+                STA PIECE_ROT
+                
+    ROTATE_DONE
                 RTS
                 
 ; *****************************************************************************
@@ -755,7 +786,7 @@ DRAW_LINES
 ; * This routine will display the "BONUS" for 50 ticks and 
 ; * then delete the lines.
 ; *******************************************************************
-REMOVE_LINES
+REMOVE_LINES_LOOP
                 .as
                 LDA TICK_COUNT
                 INC A
@@ -864,6 +895,10 @@ GAME_OVER
                 LDA #1
                 STA GAME_STATE
                 
+                ; set the display mode to tiles
+                LDA #Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
+                STA MASTER_CTRL_REG_L
+                
                 JSL CLRSCREEN
                 LDY #$A000 + 128*26 + 31
                 STY CURSORPOS
@@ -967,8 +1002,8 @@ DELETE_LINES
         LOOK_UP
                 STA BYTE_CNTR
                 
-        CHECK_NEXT
                 TAX
+        CHECK_NEXT
                 INX
                 INX
                 
@@ -986,6 +1021,8 @@ DELETE_LINES
                 DEC A
                 MVP `BOARD,`BOARD
 
+                LDA BYTE_CNTR
+                TAX
                 LDA LINE_CNTR
                 DEC A
                 STA LINE_CNTR
@@ -1062,6 +1099,8 @@ LOAD_GAME_ASSETS
                 setas
                 PLB ; MVN operations set the bank - so we need to reset
                 
+                JSR LOAD_SONG
+                
                 ; enable tile layer 0
                 LDA #$83 ; we're using a 256 stride
                 STA TL0_CONTROL_REG
@@ -1069,10 +1108,6 @@ LOAD_GAME_ASSETS
                 LDA #$1  ; enable bitmap with LUT 2
                 STA BM_CONTROL_REG
                 STA BM_START_ADDY_H ; start at $b1:0000
-                
-                ; set the display mode to tiles
-                LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
-                STA MASTER_CTRL_REG_L
                 
                 RTS
 ; *****************************************************************************
@@ -1126,8 +1161,16 @@ INIT_GAME
                 CPY #$800
                 BNE CLEAR_TS_LOOP
                 
+                ; set the display mode to tiles
+                LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
+                STA MASTER_CTRL_REG_L
+                
                 RTS
                 
+LOAD_SONG       
+                .as
+                RTS
+
 ; *****************************************************************************
 ; * variables
 ; *****************************************************************************
@@ -1139,21 +1182,6 @@ LEVEL_MSG       .text 'LEVEL:',0
 BONUS_MSG       .text 'BONUS:  ',0
 LINES_MSG       .text 'LINES:  ',0
 BYTE_CNTR       .word 0
-
-BOARD
-.rept BOARD_HEIGHT - 1
-    .byte '#'
-    .byte '#'
-    .rept BOARD_WIDTH -4
-        .byte 0
-    .next
-    .byte '#'
-    .byte '#'
-.next
-.rept BOARD_WIDTH
-    .byte '#'
-.next
-
 PIECE0
     .byte 0,0,1,0
     .byte 0,0,1,0
@@ -1195,6 +1223,19 @@ PIECE6
     .byte 0,1,1,0
     .byte 0,0,1,0
     .byte 0,0,0,0
+BOARD
+.rept BOARD_HEIGHT - 1
+    .byte '#'
+    .byte '#'
+    .rept BOARD_WIDTH -4
+        .byte 0
+    .next
+    .byte '#'
+    .byte '#'
+.next
+.rept BOARD_WIDTH
+    .byte '#'
+.next
 TILES
 .binary "tetris-tiles.data"
 BACKGROUND_PAL

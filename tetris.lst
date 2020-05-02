@@ -1,7 +1,7 @@
 
 ; 64tass Turbo Assembler Macro V1.54.1900 listing file
 ; 64tass.exe --long-address -x --intel-hex -o tetris.hex --list tetris.lst tetris.asm
-; Thu Apr 30 22:30:45 2020
+; Fri May 01 23:19:42 2020
 
 ;Offset	;Hex		;Monitor	;Source
 
@@ -687,7 +687,7 @@
 .38ff00	18		clc		                CLC
 .38ff01	fb		xce		                XCE   ; go into native mode
 .38ff02	78		sei		                SEI   ; ignore interrupts
-.38ff03	5c a0 00 16	jmp $1600a0	                JML GAME_START
+.38ff03	5c a8 00 16	jmp $1600a8	                JML GAME_START
 .38ff60					RHIRQ
 .38ff60	8b		phb		                PHB
 .38ff61	0b		phd		                PHD
@@ -701,14 +701,14 @@
 .38ff6c	2b		pld		                PLD
 .38ff6d	ab		plb		                PLB
 .38ff6e	40		rti		                RTI
-.38ffe0	5c a0 00 16	jmp $1600a0	JUMP_READY      JML GAME_START ; Kernel READY routine. Rewrite this address to jump to a custom kernel.
+.38ffe0	5c a8 00 16	jmp $1600a8	JUMP_READY      JML GAME_START ; Kernel READY routine. Rewrite this address to jump to a custom kernel.
 >38ffe4	10 ff				RVECTOR_COP     .addr HCOP     ; FFE4
 >38ffe6	20 ff				RVECTOR_BRK     .addr HBRK     ; FFE6
 >38ffe8	30 ff				RVECTOR_ABORT   .addr HABORT   ; FFE8
 >38ffea	40 ff				RVECTOR_NMI     .addr HNMI     ; FFEA
 >38ffec	00 00				                .word $0000    ; FFEC
 >38ffee	60 ff				RVECTOR_IRQ     .addr HIRQ     ; FFEE
-.38fff0	5c a0 00 16	jmp $1600a0	RRETURN         JML GAME_START
+.38fff0	5c a8 00 16	jmp $1600a8	RRETURN         JML GAME_START
 >38fff4	10 ff				RVECTOR_ECOP    .addr HCOP     ; FFF4
 >38fff6	20 ff				RVECTOR_EBRK    .addr HBRK     ; FFF6
 >38fff8	30 ff				RVECTOR_EABORT  .addr HABORT   ; FFF8
@@ -795,7 +795,7 @@
 .16001a	c9 01		cmp #$01	                CMP #FNX0_INT00_SOF
 .16001c	d0 06		bne $160024	                BNE END_CHECK
 .16001e	8d 40 01	sta $0140	                STA INT_PENDING_REG0
-.160021	20 79 00	jsr $160079	                JSR SOF_INTERRUPT
+.160021	20 81 00	jsr $160081	                JSR SOF_INTERRUPT
 .160024					END_CHECK
 .160024					CHECK_PENDING_REG1
 .160024	e2 20		sep #$20	                SEP #$20        ; set A short
@@ -821,54 +821,57 @@
 .160049	8d 88 0f	sta $0f88	                STA KEYBOARD_SC_TMP     ; Save Code Immediately
 .16004c	aa		tax		                TAX
 .16004d	bd 00 05	lda $0500,x	                LDA ScanCode_Press_Set1,X
-.160050	8f 8d 00 16	sta $16008d	                STA LAST_KEY
+.160050	8f 95 00 16	sta $160095	                STA LAST_KEY
 .160054	a2 00 a0	ldx #$a000	                LDX #$A000
 .160057	86 17		stx $17		                STX CURSORPOS
 .160059	a2 20 00	ldx #$0020	                LDX #$20
 .16005c	86 1e		stx $1e		                STX CURCOLOR
-.16005e	20 20 06	jsr $160620	                JSR DISPLAY_HEX
+.16005e	20 66 06	jsr $160666	                JSR DISPLAY_HEX
 .160061	a9 00		lda #$00	                LDA #0
 .160063	eb		xba		                XBA
-.160064	af 8d 00 16	lda $16008d	                LDA LAST_KEY
+.160064	af 95 00 16	lda $160095	                LDA LAST_KEY
 .160068	aa		tax		                TAX
-.160069	f0 03		beq $16006e	                BEQ DONT_REACT
-.16006b	fc 6f 00	jsr ($16006f,x)	                JSR (KEY_JUMP_TABLE,X)
-.16006e					    DONT_REACT
-.16006e	60		rts		                RTS
-.16006f					KEY_JUMP_TABLE
->16006f	bd 01				                .word <>INVALID_KEY
->160071	cd 02				                .word <>MOVE_PIECE_LEFT
->160073	f7 02				                .word <>MOVE_PIECE_RIGHT
->160075	21 03				                .word <>MOVE_PIECE_DOWN
->160077	33 03				                .word <>ROTATE_PIECE
-.160079					SOF_INTERRUPT
-.160079	af 9e 00 16	lda $16009e	                LDA GAME_STATE  ; The SOF is still getting called, even when masked
-.16007d	d0 05		bne $160084	                BNE SKIP_SOF
-.16007f	20 f2 00	jsr $1600f2	                JSR DISPLAY_BOARD
-.160082	80 07		bra $16008b	                BRA SOF_DONE
-.160084					    SKIP_SOF
-.160084	c9 03		cmp #$03	                CMP #3
-.160086	d0 03		bne $16008b	                BNE SOF_DONE
-.160088	20 0c 05	jsr $16050c	                JSR REMOVE_LINES
-.16008b					    SOF_DONE
-.16008b	60		rts		                RTS
+.160069	f0 0b		beq $160076	                BEQ DONT_REACT
+.16006b	af a6 00 16	lda $1600a6	                LDA GAME_STATE
+.16006f	c9 03		cmp #$03	                CMP #3
+.160071	f0 03		beq $160076	                BEQ DONT_REACT
+.160073	fc 77 00	jsr ($160077,x)	                JSR (KEY_JUMP_TABLE,X)
+.160076					    DONT_REACT
+.160076	60		rts		                RTS
+.160077					KEY_JUMP_TABLE
+>160077	c5 01				                .word <>INVALID_KEY
+>160079	d7 02				                .word <>MOVE_PIECE_LEFT
+>16007b	01 03				                .word <>MOVE_PIECE_RIGHT
+>16007d	2b 03				                .word <>MOVE_PIECE_DOWN
+>16007f	55 03				                .word <>ROTATE_PIECE
+.160081					SOF_INTERRUPT
+.160081	af a6 00 16	lda $1600a6	                LDA GAME_STATE  ; The SOF is still getting called, even when masked
+.160085	d0 05		bne $16008c	                BNE SKIP_SOF
+.160087	20 fa 00	jsr $1600fa	                JSR DISPLAY_BOARD_LOOP
+.16008a	80 07		bra $160093	                BRA SOF_DONE
+.16008c					    SKIP_SOF
+.16008c	c9 03		cmp #$03	                CMP #3
+.16008e	d0 03		bne $160093	                BNE SOF_DONE
+.160090	20 4c 05	jsr $16054c	                JSR REMOVE_LINES_LOOP
+.160093					    SOF_DONE
+.160093	60		rts		                RTS
 
 ;******  Return to file: tetris.asm
 
->16008c	00				TICK_COUNT      .byte 0
->16008d	00 00				LAST_KEY        .word 0
->16008f	00				BOARDX          .byte 0
->160090	00				BOARDY          .byte 0
->160091	00				CURRENT_PIECE   .byte 0
->160092	06 00				PIECE_X         .word 6
->160094	00 00				PIECE_Y         .word 0
->160096	00				PIECE_ROT       .byte 0
->160097	00				PIECE_FIT       .byte 0
->160098	00				GAME_SPEED      .byte 0 ; how many ticks beteen bars falling
->160099	00				PIECE_CNTR      .byte 0  ; we increase the speed of the game for every 10 pieces
->16009a	00 00 00 00			SCORE           .fill 4, 0  ; decimal formatted score
->16009e	00				GAME_STATE      .byte 0  ; 0 - running, 1 - game over, 2 - restarting, 3 - display line bonus
->16009f	01				LEVEL           .byte 1
+>160094	00				TICK_COUNT      .byte 0
+>160095	00 00				LAST_KEY        .word 0
+>160097	00				BOARDX          .byte 0
+>160098	00				BOARDY          .byte 0
+>160099	00				CURRENT_PIECE   .byte 0
+>16009a	06 00				PIECE_X         .word 6
+>16009c	00 00				PIECE_Y         .word 0
+>16009e	00				PIECE_ROT       .byte 0
+>16009f	00				PIECE_FIT       .byte 0
+>1600a0	00				GAME_SPEED      .byte 0 ; how many ticks beteen bars falling
+>1600a1	00				PIECE_CNTR      .byte 0  ; we increase the speed of the game for every 10 pieces
+>1600a2	00 00 00 00			SCORE           .fill 4, 0  ; decimal formatted score
+>1600a6	00				GAME_STATE      .byte 0  ; 0 - running, 1 - game over, 2 - restarting, 3 - display line bonus
+>1600a7	01				LEVEL           .byte 1
 =40					INITIAL_GAME_SPEED = 40
 =14					BOARD_WIDTH     = 14
 =21					BOARD_HEIGHT    = 21
@@ -883,1542 +886,1573 @@
 =$64					LINE_CNTR       = $64
 =$66					COPY_LINE_PTR   = $66
 =$68					TOTAL_LINES     = $68
-.1600a0					GAME_START
-.1600a0	e2 20		sep #$20	                SEP #$20        ; set A short
-.1600a2	c2 10		rep #$10	                REP #$10        ; set X long
-.1600a4	a9 00		lda #$00	                LDA #0
-.1600a6	8d 87 0f	sta $0f87	                STA KEYBOARD_SC_FLG
-.1600a9	c2 20		rep #$20	                REP #$20        ; set A long
-.1600ab	22 b0 10 00	jsl $0010b0	                JSL INITSUPERIO
-.1600af	a9 06 00	lda #$0006	                LDA #6
-.1600b2	8f 84 e8 af	sta $afe884	                STA GABE_RNG_SEED_LO ; set the max value from 0 to 6
-.1600b6	8f 92 00 16	sta $160092	                STA PIECE_X
-.1600ba	22 b4 10 00	jsl $0010b4	                JSL INITKEYBOARD
-.1600be	e2 20		sep #$20	                SEP #$20        ; set A short
-.1600c0	20 8f 06	jsr $16068f	                JSR LOAD_GAME_ASSETS
-.1600c3	a9 00		lda #$00	                LDA #0
-.1600c5	8d 87 0f	sta $0f87	                STA KEYBOARD_SC_FLG
-.1600c8					    NEXT_GAME
-.1600c8	20 20 07	jsr $160720	                JSR INIT_GAME
-.1600cb	22 a8 10 00	jsl $0010a8	                JSL CLRSCREEN
-.1600cf	a9 fe		lda #$fe	                LDA #~( FNX0_INT00_SOF )
-.1600d1	8f 4c 01 00	sta $00014c	                STA @lINT_MASK_REG0
-.1600d5	a9 fe		lda #$fe	                LDA #~( FNX1_INT00_KBD )
-.1600d7	8f 4d 01 00	sta $00014d	                STA @lINT_MASK_REG1
-.1600db	a9 01		lda #$01	                LDA #1
-.1600dd	8f 86 e8 af	sta $afe886	                STA GABE_RNG_CTRL
-.1600e1	20 9b 01	jsr $16019b	                JSR PICK_NEXT_PIECE
-.1600e4	58		cli		                CLI
-.1600e5					    INFINITE_LOOP
-.1600e5	ea		nop		                NOP
-.1600e6	ea		nop		                NOP
-.1600e7	ea		nop		                NOP
-.1600e8	af 9e 00 16	lda $16009e	                LDA GAME_STATE
-.1600ec	c9 02		cmp #$02	                CMP #2
-.1600ee	f0 d8		beq $1600c8	                BEQ NEXT_GAME
-.1600f0	80 f3		bra $1600e5	                BRA INFINITE_LOOP
-.1600f2					DISPLAY_BOARD
-.1600f2	af 8c 00 16	lda $16008c	                LDA TICK_COUNT
-.1600f6	1a		inc a		                INC A
-.1600f7	8f 8c 00 16	sta $16008c	                STA TICK_COUNT
-.1600fb	cf 98 00 16	cmp $160098	                CMP GAME_SPEED
-.1600ff	d0 0f		bne $160110	                BNE TIMING_DONE
-.160101	af 94 00 16	lda $160094	                LDA PIECE_Y
-.160105	1a		inc a		                INC A
-.160106	8f 94 00 16	sta $160094	                STA PIECE_Y
-.16010a	a9 00		lda #$00	                LDA #0
-.16010c	8f 8c 00 16	sta $16008c	                STA TICK_COUNT
-.160110					    TIMING_DONE
-.160110	20 a5 03	jsr $1603a5	                JSR DOES_PIECE_FIT
-.160113	af 97 00 16	lda $160097	                LDA PIECE_FIT
-.160117	f0 72		beq $16018b	                BEQ LOGIC_DONE
-.160119	af 94 00 16	lda $160094	                LDA PIECE_Y
-.16011d	d0 03		bne $160122	                BNE NOT_GAME_OVER
-.16011f	4c a6 05	jmp $1605a6	                JMP GAME_OVER
-.160122					        NOT_GAME_OVER
-.160122	20 52 03	jsr $160352	                JSR COPY_PIECE
-.160125	c2 20		rep #$20	                REP #$20        ; set A long
-.160127	f8		sed		                SED
-.160128	18		clc		                CLC
-.160129	af 9a 00 16	lda $16009a	                LDA SCORE
-.16012d	69 25 00	adc #$0025	                ADC #PIECE_VALUE
-.160130	8f 9a 00 16	sta $16009a	                STA SCORE
-.160134	d8		cld		                CLD
-.160135	e2 20		sep #$20	                SEP #$20        ; set A short
-.160137	90 09		bcc $160142	                BCC NG_CONTINUE
-.160139	af 9c 00 16	lda $16009c	                LDA SCORE+2
-.16013d	1a		inc a		                INC A
-.16013e	8f 9c 00 16	sta $16009c	                STA SCORE+2
-.160142					        NG_CONTINUE
-.160142	20 be 01	jsr $1601be	                JSR LOOK_FOR_LINES
-.160145	a9 06		lda #$06	                LDA #6
-.160147	8f 92 00 16	sta $160092	                STA PIECE_X
-.16014b	a9 00		lda #$00	                LDA #0
-.16014d	8f 94 00 16	sta $160094	                STA PIECE_Y
-.160151	8f 97 00 16	sta $160097	                STA PIECE_FIT
-.160155	8f 96 00 16	sta $160096	                STA PIECE_ROT
-.160159	8f 8c 00 16	sta $16008c	                STA TICK_COUNT
-.16015d	20 9b 01	jsr $16019b	                JSR PICK_NEXT_PIECE
-.160160	af 99 00 16	lda $160099	                LDA PIECE_CNTR
-.160164	1a		inc a		                INC A
-.160165	8f 99 00 16	sta $160099	                STA PIECE_CNTR
-.160169	c9 0a		cmp #$0a	                CMP #10
-.16016b	d0 1e		bne $16018b	                BNE LOGIC_DONE
-.16016d	a9 00		lda #$00	                LDA #0
-.16016f	8f 99 00 16	sta $160099	                STA PIECE_CNTR
-.160173	f8		sed		                SED
-.160174	18		clc		                CLC
-.160175	af 9f 00 16	lda $16009f	                LDA LEVEL
-.160179	69 01		adc #$01	                ADC #1
-.16017b	8f 9f 00 16	sta $16009f	                STA LEVEL
-.16017f	d8		cld		                CLD
-.160180	af 98 00 16	lda $160098	                LDA GAME_SPEED
-.160184	38		sec		                SEC
-.160185	e9 02		sbc #$02	                SBC #2
-.160187	8f 98 00 16	sta $160098	                STA GAME_SPEED
-.16018b					    LOGIC_DONE
-.16018b	20 ff 03	jsr $1603ff	                JSR DRAW_BOARD
-.16018e	20 4b 04	jsr $16044b	                JSR DRAW_PIECE
-.160191	20 a5 04	jsr $1604a5	                JSR DRAW_SCORE
-.160194	20 ce 04	jsr $1604ce	                JSR DRAW_LEVEL
-.160197	20 ee 04	jsr $1604ee	                JSR DRAW_LINES
-.16019a	60		rts		                RTS
-.16019b					PICK_NEXT_PIECE
-.16019b	af 84 e8 af	lda $afe884	                LDA GABE_RNG_DAT_LO
-.16019f	29 07		and #$07	                AND #7
-.1601a1	8f 91 00 16	sta $160091	                STA CURRENT_PIECE
-.1601a5	c9 07		cmp #$07	                CMP #7
-.1601a7	f0 f2		beq $16019b	                BEQ PICK_NEXT_PIECE
-.1601a9	60		rts		                RTS
-.1601aa					DISPLAY_SYMBOL
-.1601aa	87 17		sta [$17]	                STA [CURSORPOS]
-.1601ac	c2 20		rep #$20	                REP #$20        ; set A long
-.1601ae	a5 17		lda $17		                LDA CURSORPOS
-.1601b0	18		clc		                CLC
-.1601b1	69 00 20	adc #$2000	                ADC #$2000
-.1601b4	85 1f		sta $1f		                STA COLORPOS
-.1601b6	e2 20		sep #$20	                SEP #$20        ; set A short
-.1601b8	a5 1e		lda $1e		                LDA CURCOLOR
-.1601ba	87 1f		sta [$1f]	                STA [COLORPOS]
-.1601bc	60		rts		                RTS
-.1601bd					INVALID_KEY
-.1601bd	60		rts		                RTS
-.1601be					LOOK_FOR_LINES
-.1601be	64 63		stz $63		                STZ ROT_VAL2 ; line count max 4
-.1601c0	64 64		stz $64		                STZ LINE_CNTR
-.1601c2					    INIT_LINE_CHECK
-.1601c2	a0 00 00	ldy #$0000	                LDY #0
-.1601c5	64 62		stz $62		                STZ ROT_VAL  ; column count max 10
-.1601c7	c2 20		rep #$20	                REP #$20        ; set A long
-.1601c9	af 94 00 16	lda $160094	                LDA PIECE_Y
-.1601cd	8d 00 01	sta $0100	                STA UNSIGNED_MULT_A
-.1601d0	a9 0e 00	lda #$000e	                LDA #BOARD_WIDTH
-.1601d3	8d 02 01	sta $0102	                STA UNSIGNED_MULT_B
-.1601d6	ad 04 01	lda $0104	                LDA UNSIGNED_MULT_RESULT
-.1601d9	aa		tax		                TAX
-.1601da	e2 20		sep #$20	                SEP #$20        ; set A short
-.1601dc					    CHK_NEXT_COL
-.1601dc	bf d6 07 16	lda $1607d6,x	                LDA BOARD,X
-.1601e0	f0 0f		beq $1601f1	                BEQ CHK_NEXT_LINE
-.1601e2	e6 62		inc $62		                INC ROT_VAL
-.1601e4	e8		inx		                INX
-.1601e5	c8		iny		                INY
-.1601e6	c0 0e 00	cpy #$000e	                CPY #BOARD_WIDTH
-.1601e9	d0 f1		bne $1601dc	                BNE CHK_NEXT_COL
-.1601eb	a5 62		lda $62		                LDA ROT_VAL
-.1601ed	c9 0e		cmp #$0e	                CMP #BOARD_WIDTH
-.1601ef	f0 16		beq $160207	                BEQ LINE_FOUND
-.1601f1					    CHK_NEXT_LINE
-.1601f1	e6 63		inc $63		                INC ROT_VAL2
-.1601f3	af 94 00 16	lda $160094	                LDA PIECE_Y
-.1601f7	1a		inc a		                INC A
-.1601f8	8f 94 00 16	sta $160094	                STA PIECE_Y
-.1601fc	c9 14		cmp #$14	                CMP #BOARD_HEIGHT-1
-.1601fe	f0 06		beq $160206	                BEQ LOOK_LINE_DONE
-.160200	a5 63		lda $63		                LDA ROT_VAL2
-.160202	c9 04		cmp #$04	                CMP #4
-.160204	d0 bc		bne $1601c2	                BNE INIT_LINE_CHECK
-.160206					    LOOK_LINE_DONE
-.160206	60		rts		                RTS
-.160207					    LINE_FOUND
-.160207	e6 64		inc $64		                INC LINE_CNTR
-.160209	a9 03		lda #$03	                LDA #3
-.16020b	8f 9e 00 16	sta $16009e	                STA GAME_STATE
-.16020f	c2 20		rep #$20	                REP #$20        ; set A long
-.160211	af 94 00 16	lda $160094	                LDA PIECE_Y
-.160215	8d 00 01	sta $0100	                STA UNSIGNED_MULT_A
-.160218	a9 0e 00	lda #$000e	                LDA #BOARD_WIDTH
-.16021b	8d 02 01	sta $0102	                STA UNSIGNED_MULT_B
-.16021e	ad 04 01	lda $0104	                LDA UNSIGNED_MULT_RESULT
-.160221	aa		tax		                TAX
-.160222	e2 20		sep #$20	                SEP #$20        ; set A short
-.160224	e8		inx		                INX
-.160225	e8		inx		                INX ; skip the first two columns
-.160226	a0 00 00	ldy #$0000	                LDY #0
-.160229	a9 09		lda #$09	                LDA #9
-.16022b	9f d6 07 16	sta $1607d6,x	                STA BOARD,X
-.16022f	e8		inx		                INX
-.160230	c8		iny		                INY
-.160231	a9 0a		lda #$0a	                LDA #10
-.160233					        LINE_CHAR
-.160233	9f d6 07 16	sta $1607d6,x	                STA BOARD,X
-.160237	e8		inx		                INX
-.160238	c8		iny		                INY
-.160239	c0 09 00	cpy #$0009	                CPY #BOARD_WIDTH-5
-.16023c	d0 f5		bne $160233	                BNE LINE_CHAR
-.16023e	a9 0b		lda #$0b	                LDA #11
-.160240	9f d6 07 16	sta $1607d6,x	                STA BOARD,X
-.160244	80 ab		bra $1601f1	                BRA CHK_NEXT_LINE
-.160246					GET_PIECE_VALUE
-.160246	a9 00		lda #$00	                LDA #0
-.160248	eb		xba		                XBA
-.160249	af 96 00 16	lda $160096	                LDA PIECE_ROT
-.16024d	d0 05		bne $160254	                BNE ROT_NEXT
-.16024f	bf fc 08 16	lda $1608fc,x	                LDA PIECE0,X  ; ROTATION 0
-.160253	60		rts		                RTS
-.160254					    ROT_NEXT
-.160254	c9 01		cmp #$01	                CMP #1
-.160256	d0 2b		bne $160283	                BNE ROT_2
-.160258	da		phx		                PHX
-.160259	8a		txa		                TXA
-.16025a	29 f0		and #$f0	                AND #$F0
-.16025c	85 63		sta $63		                STA ROT_VAL2
-.16025e	8a		txa		                TXA
-.16025f	29 03		and #$03	                AND #3
-.160261	aa		tax		                TAX
-.160262	38		sec		                SEC
-.160263	a9 0c		lda #$0c	                LDA #12       ; ROTATION 1
-.160265					        CMP_R1
-.160265	e0 00 00	cpx #$0000	                CPX #0
-.160268	f0 05		beq $16026f	                BEQ R1_DONE
-.16026a	e9 04		sbc #$04	                SBC #4
-.16026c	ca		dex		                DEX
-.16026d	80 f6		bra $160265	                BRA CMP_R1
-.16026f					        R1_DONE
-.16026f	85 62		sta $62		                STA ROT_VAL
-.160271	a3 01		lda $01,s	                LDA 1,S
-.160273	4a		lsr a		                LSR A
-.160274	4a		lsr a		                LSR A
-.160275	29 03		and #$03	                AND #3
-.160277	18		clc		                CLC
-.160278	65 62		adc $62		                ADC ROT_VAL
-.16027a	65 63		adc $63		                ADC ROT_VAL2
-.16027c	aa		tax		                TAX
-.16027d	bf fc 08 16	lda $1608fc,x	                LDA PIECE0,X  ; ROTATION 1
-.160281	fa		plx		                PLX
-.160282	60		rts		                RTS
-.160283					    ROT_2
-.160283	c9 02		cmp #$02	                CMP #2
-.160285	d0 1a		bne $1602a1	                BNE ROT_3
-.160287	da		phx		                PHX
-.160288	8a		txa		                TXA
-.160289	29 f0		and #$f0	                AND #$F0
-.16028b	85 63		sta $63		                STA ROT_VAL2
-.16028d	8a		txa		                TXA
-.16028e	29 0f		and #$0f	                AND #$F
-.160290	85 62		sta $62		                STA ROT_VAL
-.160292	38		sec		                SEC
-.160293	a9 0f		lda #$0f	                LDA #$F
-.160295	e5 62		sbc $62		                SBC ROT_VAL
-.160297	18		clc		                CLC
-.160298	65 63		adc $63		                ADC ROT_VAL2
-.16029a	aa		tax		                TAX
-.16029b	bf fc 08 16	lda $1608fc,x	                LDA PIECE0,X  ; ROTATION 2
-.16029f	fa		plx		                PLX
-.1602a0	60		rts		                RTS
-.1602a1					    ROT_3
-.1602a1	da		phx		                PHX
-.1602a2	8a		txa		                TXA
-.1602a3	29 f0		and #$f0	                AND #$F0
-.1602a5	85 63		sta $63		                STA ROT_VAL2
-.1602a7	8a		txa		                TXA
-.1602a8	29 0c		and #$0c	                AND #$C
-.1602aa	4a		lsr a		                LSR A
-.1602ab	4a		lsr a		                LSR A
-.1602ac	85 62		sta $62		                STA ROT_VAL
-.1602ae	a3 01		lda $01,s	                LDA 1,S
-.1602b0	29 03		and #$03	                AND #3
-.1602b2	aa		tax		                TAX
-.1602b3	a9 03		lda #$03	                LDA #3       ; ROTATION 3
-.1602b5					        CMP_R3
-.1602b5	e0 00 00	cpx #$0000	                CPX #0
-.1602b8	f0 06		beq $1602c0	                BEQ R3_DONE
-.1602ba	18		clc		                CLC
-.1602bb	69 04		adc #$04	                ADC #4
-.1602bd	ca		dex		                DEX
-.1602be	80 f5		bra $1602b5	                BRA CMP_R3
-.1602c0					        R3_DONE
-.1602c0	38		sec		                SEC
-.1602c1	e5 62		sbc $62		                SBC ROT_VAL
-.1602c3	18		clc		                CLC
-.1602c4	65 63		adc $63		                ADC ROT_VAL2
-.1602c6	aa		tax		                TAX
-.1602c7	bf fc 08 16	lda $1608fc,x	                LDA PIECE0,X  ; ROTATION 3
-.1602cb	fa		plx		                PLX
-.1602cc	60		rts		                RTS
-.1602cd					MOVE_PIECE_LEFT
-.1602cd	af 9e 00 16	lda $16009e	                LDA GAME_STATE
-.1602d1	c9 01		cmp #$01	                CMP #1 ; user pressed the space bar to restart the game
-.1602d3	f0 21		beq $1602f6	                BEQ MOVE_LEFT_DONE
-.1602d5	af 92 00 16	lda $160092	                LDA PIECE_X
-.1602d9	3a		dec a		                DEC A
-.1602da	8f 92 00 16	sta $160092	                STA PIECE_X
-.1602de	20 a5 03	jsr $1603a5	                JSR DOES_PIECE_FIT
-.1602e1	af 97 00 16	lda $160097	                LDA PIECE_FIT
-.1602e5	f0 0f		beq $1602f6	                BEQ MOVE_LEFT_DONE
-.1602e7	af 92 00 16	lda $160092	                LDA PIECE_X
-.1602eb	1a		inc a		                INC A
-.1602ec	8f 92 00 16	sta $160092	                STA PIECE_X
-.1602f0	a9 00		lda #$00	                LDA #0
-.1602f2	8f 97 00 16	sta $160097	                STA PIECE_FIT
-.1602f6					    MOVE_LEFT_DONE
-.1602f6	60		rts		                RTS
-.1602f7					MOVE_PIECE_RIGHT
-.1602f7	af 9e 00 16	lda $16009e	                LDA GAME_STATE
-.1602fb	c9 01		cmp #$01	                CMP #1 ; user pressed the space bar to restart the game
-.1602fd	f0 21		beq $160320	                BEQ MOVE_RIGHT_DONE
-.1602ff	af 92 00 16	lda $160092	                LDA PIECE_X
-.160303	1a		inc a		                INC A
-.160304	8f 92 00 16	sta $160092	                STA PIECE_X
-.160308	20 a5 03	jsr $1603a5	                JSR DOES_PIECE_FIT
-.16030b	af 97 00 16	lda $160097	                LDA PIECE_FIT
-.16030f	f0 0f		beq $160320	                BEQ MOVE_RIGHT_DONE
-.160311	af 92 00 16	lda $160092	                LDA PIECE_X
-.160315	3a		dec a		                DEC A
-.160316	8f 92 00 16	sta $160092	                STA PIECE_X
-.16031a	a9 00		lda #$00	                LDA #0
-.16031c	8f 97 00 16	sta $160097	                STA PIECE_FIT
-.160320					    MOVE_RIGHT_DONE
-.160320	60		rts		                RTS
-.160321					MOVE_PIECE_DOWN
-.160321	af 9e 00 16	lda $16009e	                LDA GAME_STATE
-.160325	c9 01		cmp #$01	                CMP #1 ; user pressed the space bar to restart the game
-.160327	f0 09		beq $160332	                BEQ DOWN_DONE
-.160329	af 94 00 16	lda $160094	                LDA PIECE_Y
-.16032d	1a		inc a		                INC A
-.16032e	8f 94 00 16	sta $160094	                STA PIECE_Y
-.160332					    DOWN_DONE
-.160332	60		rts		                RTS
-.160333					ROTATE_PIECE
-.160333	af 9e 00 16	lda $16009e	                LDA GAME_STATE
-.160337	c9 01		cmp #$01	                CMP #1 ; user pressed the space bar to restart the game
-.160339	d0 07		bne $160342	                BNE ROT_START
-.16033b	a9 02		lda #$02	                LDA #2
-.16033d	8f 9e 00 16	sta $16009e	                STA GAME_STATE
-.160341	60		rts		                RTS
-.160342					    ROT_START
-.160342	af 96 00 16	lda $160096	                LDA PIECE_ROT
-.160346	1a		inc a		                INC A
-.160347	c9 04		cmp #$04	                CMP #4
-.160349	d0 02		bne $16034d	                BNE ROTATE_DONE
-.16034b	a9 00		lda #$00	                LDA #0
-.16034d					    ROTATE_DONE
-.16034d	8f 96 00 16	sta $160096	                STA PIECE_ROT
-.160351	60		rts		                RTS
-.160352					COPY_PIECE
-.160352	af 91 00 16	lda $160091	                LDA CURRENT_PIECE
-.160356	0a		asl a		                ASL A
-.160357	0a		asl a		                ASL A
-.160358	0a		asl a		                ASL A
-.160359	0a		asl a		                ASL A
-.16035a	aa		tax		                TAX
-.16035b	c2 20		rep #$20	                REP #$20        ; set A long
-.16035d	af 94 00 16	lda $160094	                LDA PIECE_Y
-.160361	3a		dec a		                DEC A
-.160362	8d 00 01	sta $0100	                STA UNSIGNED_MULT_A
-.160365	a9 0e 00	lda #$000e	                LDA #BOARD_WIDTH
-.160368	8d 02 01	sta $0102	                STA UNSIGNED_MULT_B
-.16036b	ad 04 01	lda $0104	                LDA UNSIGNED_MULT_RESULT
-.16036e	18		clc		                CLC
-.16036f	6f 92 00 16	adc $160092	                ADC PIECE_X
-.160373	a8		tay		                TAY
-.160374	a9 00 00	lda #$0000	                LDA #0
-.160377	e2 20		sep #$20	                SEP #$20        ; set A short
-.160379					    NEXT_COPY
-.160379	20 46 02	jsr $160246	                JSR GET_PIECE_VALUE
-.16037c	c9 00		cmp #$00	                CMP #0
-.16037e	f0 0e		beq $16038e	                BEQ SKIP_COPY
-.160380	da		phx		                PHX
-.160381	bb		tyx		                TYX
-.160382	18		clc		                CLC
-.160383	af 91 00 16	lda $160091	                LDA CURRENT_PIECE
-.160387	69 02		adc #$02	                ADC #2
-.160389	9f d6 07 16	sta $1607d6,x	                STA BOARD,X
-.16038d	fa		plx		                PLX
-.16038e					        SKIP_COPY
-.16038e	e8		inx		                INX
-.16038f	c8		iny		                INY
-.160390	8a		txa		                TXA
-.160391	29 03		and #$03	                AND #3
-.160393	d0 e4		bne $160379	                BNE NEXT_COPY
-.160395	c2 20		rep #$20	                REP #$20        ; set A long
-.160397	98		tya		                TYA
-.160398	18		clc		                CLC
-.160399	69 0a 00	adc #$000a	                ADC #BOARD_WIDTH-4
-.16039c	a8		tay		                TAY
-.16039d	e2 20		sep #$20	                SEP #$20        ; set A short
-.16039f	8a		txa		                TXA
-.1603a0	29 0f		and #$0f	                AND #$F
-.1603a2	d0 d5		bne $160379	                BNE NEXT_COPY
-.1603a4	60		rts		                RTS
-.1603a5					DOES_PIECE_FIT
-.1603a5	a9 00		lda #$00	                LDA #0
-.1603a7	eb		xba		                XBA
-.1603a8	af 91 00 16	lda $160091	                LDA CURRENT_PIECE
-.1603ac	0a		asl a		                ASL A
-.1603ad	0a		asl a		                ASL A
-.1603ae	0a		asl a		                ASL A
-.1603af	0a		asl a		                ASL A
-.1603b0	aa		tax		                TAX
-.1603b1	c2 20		rep #$20	                REP #$20        ; set A long
-.1603b3	af 94 00 16	lda $160094	                LDA PIECE_Y
-.1603b7	8d 00 01	sta $0100	                STA UNSIGNED_MULT_A
-.1603ba	a9 0e 00	lda #$000e	                LDA #BOARD_WIDTH
-.1603bd	8d 02 01	sta $0102	                STA UNSIGNED_MULT_B
-.1603c0	ad 04 01	lda $0104	                LDA UNSIGNED_MULT_RESULT
-.1603c3	18		clc		                CLC
-.1603c4	6f 92 00 16	adc $160092	                ADC PIECE_X
-.1603c8	a8		tay		                TAY
-.1603c9	a9 00 00	lda #$0000	                LDA #0
-.1603cc	e2 20		sep #$20	                SEP #$20        ; set A short
-.1603ce					    NEXT_COLLISION
-.1603ce	20 46 02	jsr $160246	                JSR GET_PIECE_VALUE
-.1603d1	c9 00		cmp #$00	                CMP #0
-.1603d3	f0 0b		beq $1603e0	                BEQ SKIP_BYTE
-.1603d5	da		phx		                PHX
-.1603d6	bb		tyx		                TYX
-.1603d7	bf d6 07 16	lda $1607d6,x	                LDA BOARD,X
-.1603db	fa		plx		                PLX
-.1603dc	c9 00		cmp #$00	                CMP #0
-.1603de	d0 18		bne $1603f8	                BNE OCCUPIED
-.1603e0					    SKIP_BYTE
-.1603e0	e8		inx		                INX
-.1603e1	c8		iny		                INY
-.1603e2	8a		txa		                TXA
-.1603e3	29 03		and #$03	                AND #3
-.1603e5	d0 e7		bne $1603ce	                BNE NEXT_COLLISION
-.1603e7	c2 20		rep #$20	                REP #$20        ; set A long
-.1603e9	98		tya		                TYA
-.1603ea	18		clc		                CLC
-.1603eb	69 0a 00	adc #$000a	                ADC #BOARD_WIDTH-4
-.1603ee	a8		tay		                TAY
-.1603ef	e2 20		sep #$20	                SEP #$20        ; set A short
-.1603f1	8a		txa		                TXA
-.1603f2	29 0f		and #$0f	                AND #$F
-.1603f4	d0 d8		bne $1603ce	                BNE NEXT_COLLISION
-.1603f6	80 06		bra $1603fe	                BRA PF_DONE
-.1603f8					    OCCUPIED
-.1603f8	a9 01		lda #$01	                LDA #1
-.1603fa	8f 97 00 16	sta $160097	                STA PIECE_FIT
-.1603fe					    PF_DONE
-.1603fe	60		rts		                RTS
-.1603ff					DRAW_BOARD
-.1603ff	a2 4d 51	ldx #$514d	                LDX #START_BOARD
-.160402	86 17		stx $17		                STX CURSORPOS
-.160404	a2 00 00	ldx #$0000	                LDX #0
-.160407	a9 00		lda #$00	                LDA #0
-.160409	8f 90 00 16	sta $160090	                STA BOARDY
-.16040d					    NEXT_ROW
-.16040d	a9 00		lda #$00	                LDA #0
-.16040f	8f 8f 00 16	sta $16008f	                STA BOARDX
-.160413					        NEXT_SYMBOL
-.160413	bf d6 07 16	lda $1607d6,x	                LDA BOARD,X
-.160417	c9 23		cmp #$23	                CMP #'#'
-.160419	d0 04		bne $16041f	                BNE SKIP_DR_BRD
-.16041b	a9 01		lda #$01	                LDA #1
-.16041d	80 00		bra $16041f	                BRA DISPLAY_BLOCK
-.16041f					            SKIP_DR_BRD
-.16041f					            DISPLAY_BLOCK
-.16041f	87 17		sta [$17]	                STA [CURSORPOS]
-.160421	e8		inx		                INX
-.160422	e6 17		inc $17		                INC CURSORPOS
-.160424	af 8f 00 16	lda $16008f	                LDA BOARDX
-.160428	1a		inc a		                INC A
-.160429	8f 8f 00 16	sta $16008f	                STA BOARDX
-.16042d	c9 0e		cmp #$0e	                CMP #BOARD_WIDTH
-.16042f	d0 e2		bne $160413	                BNE NEXT_SYMBOL
-.160431	c2 20		rep #$20	                REP #$20        ; set A long
-.160433	a5 17		lda $17		                LDA CURSORPOS
-.160435	18		clc		                CLC
-.160436	69 32 00	adc #$0032	                ADC #$40-BOARD_WIDTH
-.160439	85 17		sta $17		                STA CURSORPOS
-.16043b	e2 20		sep #$20	                SEP #$20        ; set A short
-.16043d	af 90 00 16	lda $160090	                LDA BOARDY
-.160441	1a		inc a		                INC A
-.160442	8f 90 00 16	sta $160090	                STA BOARDY
-.160446	c9 15		cmp #$15	                CMP #BOARD_HEIGHT
-.160448	d0 c3		bne $16040d	                BNE NEXT_ROW
-.16044a	60		rts		                RTS
-.16044b					DRAW_PIECE
-.16044b	c2 20		rep #$20	                REP #$20        ; set A long
-.16044d	a9 4d 51	lda #$514d	                LDA #START_BOARD
-.160450	18		clc		                CLC
-.160451	6f 92 00 16	adc $160092	                ADC PIECE_X
-.160455	85 17		sta $17		                STA CURSORPOS
-.160457	a9 40 00	lda #$0040	                LDA #64
-.16045a	8d 00 01	sta $0100	                STA UNSIGNED_MULT_A
-.16045d	af 94 00 16	lda $160094	                LDA PIECE_Y
-.160461	8d 02 01	sta $0102	                STA UNSIGNED_MULT_B
-.160464	ad 04 01	lda $0104	                LDA UNSIGNED_MULT_RESULT
-.160467	18		clc		                CLC
-.160468	65 17		adc $17		                ADC CURSORPOS
-.16046a	85 17		sta $17		                STA CURSORPOS
-.16046c	e2 20		sep #$20	                SEP #$20        ; set A short
-.16046e	a9 00		lda #$00	                LDA #0
-.160470	eb		xba		                XBA
-.160471	af 91 00 16	lda $160091	                LDA CURRENT_PIECE
-.160475	0a		asl a		                ASL A
-.160476	0a		asl a		                ASL A
-.160477	0a		asl a		                ASL A
-.160478	0a		asl a		                ASL A
-.160479	aa		tax		                TAX
-.16047a					        NEXT_PIECE_SYMBOL
-.16047a	20 46 02	jsr $160246	                JSR GET_PIECE_VALUE
-.16047d	c9 00		cmp #$00	                CMP #0
-.16047f	f0 09		beq $16048a	                BEQ SKIP_DRAW
-.160481	af 91 00 16	lda $160091	                LDA CURRENT_PIECE
-.160485	18		clc		                CLC
-.160486	69 02		adc #$02	                ADC #2
-.160488	87 17		sta [$17]	                STA [CURSORPOS]
-.16048a					        SKIP_DRAW
-.16048a	e8		inx		                INX
-.16048b	e6 17		inc $17		                INC CURSORPOS
-.16048d	8a		txa		                TXA
-.16048e	29 03		and #$03	                AND #3
-.160490	d0 e8		bne $16047a	                BNE NEXT_PIECE_SYMBOL
-.160492	c2 20		rep #$20	                REP #$20        ; set A long
-.160494	a5 17		lda $17		                LDA CURSORPOS
-.160496	18		clc		                CLC
-.160497	69 3c 00	adc #$003c	                ADC #$40-4
-.16049a	85 17		sta $17		                STA CURSORPOS
-.16049c	8a		txa		                TXA
-.16049d	29 0f 00	and #$000f	                AND #$F
-.1604a0	e2 20		sep #$20	                SEP #$20        ; set A short
-.1604a2	d0 d6		bne $16047a	                BNE NEXT_PIECE_SYMBOL
-.1604a4	60		rts		                RTS
-.1604a5					DRAW_SCORE
-.1604a5	a0 b8 a2	ldy #$a2b8	                LDY #$A000 + 128*5 + 56
-.1604a8	84 17		sty $17		                STY CURSORPOS
-.1604aa	a9 20		lda #$20	                LDA #$20
-.1604ac	85 1e		sta $1e		                STA CURCOLOR
-.1604ae	a0 b4 07	ldy #$07b4	                LDY #<>SCORE_MSG
-.1604b1	84 60		sty $60		                STY MSG_ADDR
-.1604b3	20 8c 05	jsr $16058c	                JSR DISPLAY_MSG
-.1604b6	e6 17		inc $17		                INC CURSORPOS
-.1604b8	af 9c 00 16	lda $16009c	                LDA SCORE + 2
-.1604bc	20 20 06	jsr $160620	                JSR DISPLAY_HEX
-.1604bf	af 9b 00 16	lda $16009b	                LDA SCORE + 1
-.1604c3	20 20 06	jsr $160620	                JSR DISPLAY_HEX
-.1604c6	af 9a 00 16	lda $16009a	                LDA SCORE
-.1604ca	20 20 06	jsr $160620	                JSR DISPLAY_HEX
-.1604cd	60		rts		                RTS
-.1604ce					DRAW_LEVEL
-.1604ce	a0 b8 a3	ldy #$a3b8	                LDY #$A000 + 128*7 + 56
-.1604d1	84 17		sty $17		                STY CURSORPOS
-.1604d3	a9 20		lda #$20	                LDA #$20
-.1604d5	85 1e		sta $1e		                STA CURCOLOR
-.1604d7	a0 bb 07	ldy #$07bb	                LDY #<>LEVEL_MSG
-.1604da	84 60		sty $60		                STY MSG_ADDR
-.1604dc	20 8c 05	jsr $16058c	                JSR DISPLAY_MSG
-.1604df	18		clc		                CLC
-.1604e0	a5 17		lda $17		                LDA CURSORPOS
-.1604e2	69 05		adc #$05	                ADC #5
-.1604e4	85 17		sta $17		                STA CURSORPOS
-.1604e6	af 9f 00 16	lda $16009f	                LDA LEVEL
-.1604ea	20 20 06	jsr $160620	                JSR DISPLAY_HEX
-.1604ed	60		rts		                RTS
-.1604ee					DRAW_LINES
-.1604ee	a0 b8 a6	ldy #$a6b8	                LDY #$A000 + 128*13 + 56
-.1604f1	84 17		sty $17		                STY CURSORPOS
-.1604f3	a9 20		lda #$20	                LDA #$20
-.1604f5	85 1e		sta $1e		                STA CURCOLOR
-.1604f7	a0 cb 07	ldy #$07cb	                LDY #<>LINES_MSG
-.1604fa	84 60		sty $60		                STY MSG_ADDR
-.1604fc	20 8c 05	jsr $16058c	                JSR DISPLAY_MSG
-.1604ff	e6 17		inc $17		                INC CURSORPOS
-.160501	a5 69		lda $69		                LDA TOTAL_LINES+1
-.160503	20 20 06	jsr $160620	                JSR DISPLAY_HEX
-.160506	a5 68		lda $68		                LDA TOTAL_LINES
-.160508	20 20 06	jsr $160620	                JSR DISPLAY_HEX
-.16050b	60		rts		                RTS
-.16050c					REMOVE_LINES
-.16050c	af 8c 00 16	lda $16008c	                LDA TICK_COUNT
-.160510	1a		inc a		                INC A
-.160511	8f 8c 00 16	sta $16008c	                STA TICK_COUNT
-.160515	c9 01		cmp #$01	                CMP #1
-.160517	d0 23		bne $16053c	                BNE WAIT_FOR_50
-.160519	a0 b8 a5	ldy #$a5b8	                LDY #$A000 + 128*11 + 56
-.16051c	84 17		sty $17		                STY CURSORPOS
-.16051e	a9 20		lda #$20	                LDA #$20
-.160520	85 1e		sta $1e		                STA CURCOLOR
-.160522	a0 c2 07	ldy #$07c2	                LDY #<>BONUS_MSG
-.160525	84 60		sty $60		                STY MSG_ADDR
-.160527	20 8c 05	jsr $16058c	                JSR DISPLAY_MSG
-.16052a	e6 17		inc $17		                INC CURSORPOS
-.16052c	a6 64		ldx $64		                LDX LINE_CNTR
-.16052e	bf a5 07 16	lda $1607a5,x	                LDA BONUS,X
-.160532	20 20 06	jsr $160620	                JSR DISPLAY_HEX
-.160535	a9 00		lda #$00	                LDA #0
-.160537	20 20 06	jsr $160620	                JSR DISPLAY_HEX
-.16053a	80 4f		bra $16058b	                BRA SKIP_DELETE_LINES
-.16053c					    WAIT_FOR_50
-.16053c	c9 32		cmp #$32	                CMP #50
-.16053e	d0 4b		bne $16058b	                BNE SKIP_DELETE_LINES
-.160540	a0 b8 a5	ldy #$a5b8	                LDY #$A000 + 128*11 + 56
-.160543	84 17		sty $17		                STY CURSORPOS
-.160545	a9 00		lda #$00	                LDA #0
-.160547	a0 00 00	ldy #$0000	                LDY #0
-.16054a					        CLEAR_BONUS_LP
-.16054a	97 17		sta [$17],y	                STA [CURSORPOS],Y
-.16054c	c8		iny		                INY
-.16054d	c0 10 00	cpy #$0010	                CPY #16
-.160550	d0 f8		bne $16054a	                BNE CLEAR_BONUS_LP
-.160552	a6 64		ldx $64		                LDX LINE_CNTR
-.160554	bf a5 07 16	lda $1607a5,x	                LDA BONUS,X
-.160558	eb		xba		                XBA ; multiply by 256
-.160559	a9 00		lda #$00	                LDA #0
-.16055b	c2 20		rep #$20	                REP #$20        ; set A long
-.16055d	f8		sed		                SED
-.16055e	18		clc		                CLC
-.16055f	6f 9a 00 16	adc $16009a	                ADC SCORE
-.160563	8f 9a 00 16	sta $16009a	                STA SCORE
-.160567	a5 64		lda $64		                LDA LINE_CNTR
-.160569	18		clc		                CLC
-.16056a	65 68		adc $68		                ADC TOTAL_LINES
-.16056c	85 68		sta $68		                STA TOTAL_LINES
-.16056e	e2 20		sep #$20	                SEP #$20        ; set A short
-.160570	90 0b		bcc $16057d	                BCC BONUS_CONTINUE
-.160572	af 9c 00 16	lda $16009c	                LDA SCORE+2
-.160576	18		clc		                CLC
-.160577	69 01		adc #$01	                ADC #1
-.160579	8f 9c 00 16	sta $16009c	                STA SCORE+2
-.16057d					        BONUS_CONTINUE
-.16057d	d8		cld		                CLD
-.16057e	20 46 06	jsr $160646	                JSR DELETE_LINES
-.160581	a9 00		lda #$00	                LDA #0
-.160583	8f 8c 00 16	sta $16008c	                STA TICK_COUNT
-.160587	8f 9e 00 16	sta $16009e	                STA GAME_STATE
-.16058b					    SKIP_DELETE_LINES
-.16058b	60		rts		                RTS
-.16058c					DISPLAY_MSG
-.16058c	8b		phb		                PHB
-.16058d	a9 16		lda #$16	                LDA #`SCORE_MSG
-.16058f	48		pha		                PHA
-.160590	ab		plb		                PLB
-.160591					    MSG_LOOP
-.160591	b2 60		lda ($60)	                LDA (MSG_ADDR)
-.160593	f0 0f		beq $1605a4	                BEQ MSG_DONE
-.160595	20 aa 01	jsr $1601aa	                JSR DISPLAY_SYMBOL
-.160598	a6 17		ldx $17		                LDX CURSORPOS
-.16059a	e8		inx		                INX
-.16059b	86 17		stx $17		                STX CURSORPOS
-.16059d	a6 60		ldx $60		                LDX MSG_ADDR
-.16059f	e8		inx		                INX
-.1605a0	86 60		stx $60		                STX MSG_ADDR
-.1605a2	80 ed		bra $160591	                BRA MSG_LOOP
-.1605a4	ab		plb		    MSG_DONE    PLB
-.1605a5	60		rts		                RTS
-.1605a6					GAME_OVER
-.1605a6	a9 ff		lda #$ff	                LDA #$FF
-.1605a8	8f 4c 01 00	sta $00014c	                STA @lINT_MASK_REG0
-.1605ac	a9 01		lda #$01	                LDA #1
-.1605ae	8f 9e 00 16	sta $16009e	                STA GAME_STATE
-.1605b2	22 a8 10 00	jsl $0010a8	                JSL CLRSCREEN
-.1605b6	a0 1f ad	ldy #$ad1f	                LDY #$A000 + 128*26 + 31
-.1605b9	84 17		sty $17		                STY CURSORPOS
-.1605bb	a9 23		lda #$23	                LDA #$23
-.1605bd	85 1e		sta $1e		                STA CURCOLOR
-.1605bf	a0 aa 07	ldy #$07aa	                LDY #<>GAME_OVER_MSG
-.1605c2	84 60		sty $60		                STY MSG_ADDR
-.1605c4	20 8c 05	jsr $16058c	                JSR DISPLAY_MSG
-.1605c7	a0 9d ad	ldy #$ad9d	                LDY #$A000 + 128*27 + 29
-.1605ca	84 17		sty $17		                STY CURSORPOS
-.1605cc	a9 20		lda #$20	                LDA #$20
-.1605ce	85 1e		sta $1e		                STA CURCOLOR
-.1605d0	a0 b4 07	ldy #$07b4	                LDY #<>SCORE_MSG
-.1605d3	84 60		sty $60		                STY MSG_ADDR
-.1605d5	20 8c 05	jsr $16058c	                JSR DISPLAY_MSG
-.1605d8	e6 17		inc $17		                INC CURSORPOS
-.1605da	af 9c 00 16	lda $16009c	                LDA SCORE + 2
-.1605de	20 20 06	jsr $160620	                JSR DISPLAY_HEX
-.1605e1	af 9b 00 16	lda $16009b	                LDA SCORE + 1
-.1605e5	20 20 06	jsr $160620	                JSR DISPLAY_HEX
-.1605e8	af 9a 00 16	lda $16009a	                LDA SCORE
-.1605ec	20 20 06	jsr $160620	                JSR DISPLAY_HEX
-.1605ef	a9 00		lda #$00	                LDA #0
-.1605f1	8f 94 00 16	sta $160094	                STA PIECE_Y
-.1605f5	a2 02 00	ldx #$0002	                LDX #2
-.1605f8					        CLEAR_BOARD_ROW
-.1605f8	a0 00 00	ldy #$0000	                LDY #0
-.1605fb	a9 00		lda #$00	                LDA #0
-.1605fd					        CLEAR_BOARD_COL
-.1605fd	9f d6 07 16	sta $1607d6,x	                STA BOARD,X
-.160601	e8		inx		                INX
-.160602	c8		iny		                INY
-.160603	c0 0a 00	cpy #$000a	                CPY #10
-.160606	d0 f5		bne $1605fd	                BNE CLEAR_BOARD_COL
-.160608	e8		inx		                INX
-.160609	e8		inx		                INX
-.16060a	e8		inx		                INX
-.16060b	e8		inx		                INX
-.16060c	af 94 00 16	lda $160094	                LDA PIECE_Y
-.160610	1a		inc a		                INC A
-.160611	8f 94 00 16	sta $160094	                STA PIECE_Y
-.160615	c9 14		cmp #$14	                CMP #BOARD_HEIGHT-1
-.160617	d0 df		bne $1605f8	                BNE CLEAR_BOARD_ROW
-.160619	a9 00		lda #$00	                LDA #0
-.16061b	8f 94 00 16	sta $160094	                STA PIECE_Y
-.16061f	60		rts		                RTS
-.160620					DISPLAY_HEX
-.160620	48		pha		                PHA
-.160621	eb		xba		                XBA
-.160622	a9 00		lda #$00	                LDA #0
-.160624	eb		xba		                XBA
-.160625	29 f0		and #$f0	                AND #$F0
-.160627	4a		lsr a		                LSR A
-.160628	4a		lsr a		                LSR A
-.160629	4a		lsr a		                LSR A
-.16062a	4a		lsr a		                LSR A
-.16062b	aa		tax		                TAX
-.16062c	bf 95 07 16	lda $160795,x	                LDA HEX_VALUES,X
-.160630	20 aa 01	jsr $1601aa	                JSR DISPLAY_SYMBOL
-.160633	e6 17		inc $17		                INC CURSORPOS
-.160635	a9 00		lda #$00	                LDA #0  ; clear B
-.160637	eb		xba		                XBA
-.160638	68		pla		                PLA
-.160639	29 0f		and #$0f	                AND #$F
-.16063b	aa		tax		                TAX
-.16063c	bf 95 07 16	lda $160795,x	                LDA HEX_VALUES,X
-.160640	20 aa 01	jsr $1601aa	                JSR DISPLAY_SYMBOL
-.160643	e6 17		inc $17		                INC CURSORPOS
-.160645	60		rts		                RTS
-.160646					DELETE_LINES
-.160646	8b		phb		                PHB
-.160647	c2 20		rep #$20	                REP #$20        ; set A long
-.160649	a5 64		lda $64		                LDA LINE_CNTR
-.16064b	29 0f 00	and #$000f	                AND #$F
-.16064e	f0 3b		beq $16068b	                BEQ DELETE_LINES_DONE
-.160650	a9 0a 01	lda #$010a	                LDA #BOARD_WIDTH * (BOARD_HEIGHT-2)
-.160653					        LOOK_UP
-.160653	8f d4 07 16	sta $1607d4	                STA BYTE_CNTR
-.160657					        CHECK_NEXT
-.160657	aa		tax		                TAX
-.160658	e8		inx		                INX
-.160659	e8		inx		                INX
-.16065a	bf d6 07 16	lda $1607d6,x	                LDA @lBOARD,X
-.16065e	c9 09 0a	cmp #$0a09	                CMP #$A09
-.160661	d0 1e		bne $160681	                BNE DONT_DELETE
-.160663	a9 d6 07	lda #$07d6	                LDA #<>BOARD
-.160666	18		clc		                CLC
-.160667	6f d4 07 16	adc $1607d4	                ADC BYTE_CNTR
-.16066b	aa		tax		                TAX
-.16066c	69 0e 00	adc #$000e	                ADC #BOARD_WIDTH
-.16066f	a8		tay		                TAY
-.160670	af d4 07 16	lda $1607d4	                LDA BYTE_CNTR
-.160674	3a		dec a		                DEC A
-.160675	44 16 16	mvp $16,$16	                MVP `BOARD,`BOARD
-.160678	a5 64		lda $64		                LDA LINE_CNTR
-.16067a	3a		dec a		                DEC A
-.16067b	85 64		sta $64		                STA LINE_CNTR
-.16067d	d0 d8		bne $160657	                BNE CHECK_NEXT
-.16067f	80 0a		bra $16068b	                BRA DELETE_LINES_DONE
-.160681					        DONT_DELETE
-.160681	af d4 07 16	lda $1607d4	                LDA BYTE_CNTR
-.160685	38		sec		                SEC
-.160686	e9 0e 00	sbc #$000e	                SBC #BOARD_WIDTH
-.160689	80 c8		bra $160653	                BRA LOOK_UP
-.16068b					    DELETE_LINES_DONE
-.16068b	e2 20		sep #$20	                SEP #$20        ; set A short
-.16068d	ab		plb		                PLB
-.16068e	60		rts		                RTS
-.16068f					LOAD_GAME_ASSETS
-.16068f	8b		phb		                PHB
-.160690	a9 80		lda #$80	                LDA #Mstr_Ctrl_Disable_Vid
-.160692	8f 00 00 af	sta $af0000	                STA MASTER_CTRL_REG_L
-.160696	c2 20		rep #$20	                REP #$20        ; set A long
-.160698	a9 00 04	lda #$0400	                LDA #$400
-.16069b	a2 68 1d	ldx #$1d68	                LDX #<>PALETTE
-.16069e	a0 00 24	ldy #$2400	                LDY #<>GRPH_LUT1_PTR
-.1606a1	54 af 16	mvn $16,$af	                MVN #`PALETTE,#`GRPH_LUT1_PTR
-.1606a4	a9 00 04	lda #$0400	                LDA #$400
-.1606a7	a2 6c 19	ldx #$196c	                LDX #<>BACKGROUND_PAL
-.1606aa	a0 00 20	ldy #$2000	                LDY #<>GRPH_LUT0_PTR
-.1606ad	54 af 16	mvn $16,$af	                MVN #`PALETTE,#`GRPH_LUT0_PTR
-.1606b0	a9 ff ff	lda #$ffff	                LDA #$FFFF
-.1606b3	a2 00 00	ldx #$0000	                LDX #<>BACKGROUND
-.1606b6	a0 00 00	ldy #$0000	                LDY #$0
-.1606b9	54 b1 17	mvn $17,$b1	                MVN `BACKGROUND,$B1
-.1606bc	a9 ff ff	lda #$ffff	                LDA #$FFFF
-.1606bf	a2 00 00	ldx #$0000	                LDX #<>BACKGROUND
-.1606c2	a0 00 00	ldy #$0000	                LDY #0
-.1606c5	54 b2 18	mvn $18,$b2	                MVN `BACKGROUND+$10000,$B2
-.1606c8	a9 ff ff	lda #$ffff	                LDA #$FFFF
-.1606cb	a2 00 00	ldx #$0000	                LDX #<>BACKGROUND
-.1606ce	a0 00 00	ldy #$0000	                LDY #0
-.1606d1	54 b3 19	mvn $19,$b3	                MVN `BACKGROUND+$20000,$B3
-.1606d4	a9 ff ff	lda #$ffff	                LDA #$FFFF
-.1606d7	a2 00 00	ldx #$0000	                LDX #<>BACKGROUND
-.1606da	a0 00 00	ldy #$0000	                LDY #0
-.1606dd	54 b4 1a	mvn $1a,$b4	                MVN `BACKGROUND+$30000,$B4
-.1606e0	a9 ff af	lda #$afff	                LDA #$AFFF
-.1606e3	a2 00 00	ldx #$0000	                LDX #<>BACKGROUND
-.1606e6	a0 00 00	ldy #$0000	                LDY #0
-.1606e9	54 b5 1b	mvn $1b,$b5	                MVN `BACKGROUND+$40000,$B5
-.1606ec	a9 00 10	lda #$1000	                LDA #$1000
-.1606ef	a2 6c 09	ldx #$096c	                LDX #<>TILES
-.1606f2	a0 00 00	ldy #$0000	                LDY #0
-.1606f5	54 b0 16	mvn $16,$b0	                MVN `TILES,$B0
-.1606f8	a9 80 02	lda #$0280	                LDA #640
-.1606fb	8f 44 01 af	sta $af0144	                STA BM_X_SIZE_L
-.1606ff	a9 e0 01	lda #$01e0	                LDA #480
-.160702	8f 46 01 af	sta $af0146	                STA BM_Y_SIZE_L
-.160706	e2 20		sep #$20	                SEP #$20        ; set A short
-.160708	ab		plb		                PLB ; MVN operations set the bank - so we need to reset
-.160709	a9 83		lda #$83	                LDA #$83 ; we're using a 256 stride
-.16070b	8f 00 01 af	sta $af0100	                STA TL0_CONTROL_REG
-.16070f	a9 01		lda #$01	                LDA #$1  ; enable bitmap with LUT 2
-.160711	8f 40 01 af	sta $af0140	                STA BM_CONTROL_REG
-.160715	8f 43 01 af	sta $af0143	                STA BM_START_ADDY_H ; start at $b1:0000
-.160719	a9 1f		lda #$1f	                LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
-.16071b	8f 00 00 af	sta $af0000	                STA MASTER_CTRL_REG_L
-.16071f	60		rts		                RTS
-.160720					INIT_GAME
-.160720	a9 28		lda #$28	                LDA #INITIAL_GAME_SPEED
-.160722	8f 98 00 16	sta $160098	                STA GAME_SPEED
-.160726	a9 00		lda #$00	                LDA #0       ;Set Cursor Disabled
-.160728	8f 10 00 af	sta $af0010	                STA VKY_TXT_CURSOR_CTRL_REG
-.16072c	8f 94 00 16	sta $160094	                STA PIECE_Y
-.160730	8f 97 00 16	sta $160097	                STA PIECE_FIT
-.160734	8f 8c 00 16	sta $16008c	                STA TICK_COUNT
-.160738	8f 9e 00 16	sta $16009e	                STA GAME_STATE
-.16073c	8f 9a 00 16	sta $16009a	                STA SCORE
-.160740	8f 9b 00 16	sta $16009b	                STA SCORE + 1
-.160744	8f 9c 00 16	sta $16009c	                STA SCORE + 2
-.160748	85 68		sta $68		                STA TOTAL_LINES
-.16074a	85 69		sta $69		                STA TOTAL_LINES + 1
-.16074c	8f 05 00 af	sta $af0005	                STA BORDER_COLOR_B
-.160750	8f 06 00 af	sta $af0006	                STA BORDER_COLOR_G
-.160754	8f 07 00 af	sta $af0007	                STA BORDER_COLOR_R
-.160758	a9 01		lda #$01	                LDA #1
-.16075a	8f 9f 00 16	sta $16009f	                STA LEVEL
-.16075e	a9 ff		lda #$ff	                LDA #$FF
-.160760	8f 48 01 00	sta $000148	                STA @lINT_EDGE_REG0
-.160764	8f 49 01 00	sta $000149	                STA @lINT_EDGE_REG1
-.160768	8f 4a 01 00	sta $00014a	                STA @lINT_EDGE_REG2
-.16076c	8f 4b 01 00	sta $00014b	                STA @lINT_EDGE_REG3
-.160770	a9 ff		lda #$ff	                LDA #$FF
-.160772	8f 4c 01 00	sta $00014c	                STA @lINT_MASK_REG0
-.160776	8f 4d 01 00	sta $00014d	                STA @lINT_MASK_REG1
-.16077a	8f 4e 01 00	sta $00014e	                STA @lINT_MASK_REG2
-.16077e	8f 4f 01 00	sta $00014f	                STA @lINT_MASK_REG3
-.160782	a2 00 50	ldx #$5000	                LDX #$5000
-.160785	86 17		stx $17		                STX CURSORPOS
-.160787	a9 00		lda #$00	                LDA #0
-.160789	a0 00 00	ldy #$0000	                LDY #0
-.16078c					        CLEAR_TS_LOOP
-.16078c	97 17		sta [$17],y	                STA [CURSORPOS],Y
-.16078e	c8		iny		                INY
-.16078f	c0 00 08	cpy #$0800	                CPY #$800
-.160792	d0 f8		bne $16078c	                BNE CLEAR_TS_LOOP
-.160794	60		rts		                RTS
->160795	30 31 32 33 34 35 36 37		HEX_VALUES      .text '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'
->16079d	38 39 41 42 43 44 45 46
->1607a5	00 01 03 06 10			BONUS           .text 0,1,3,6,$10
->1607aa	47 41 4d 45 20 4f 56 45		GAME_OVER_MSG   .text 'GAME OVER',0
->1607b2	52 00
->1607b4	53 43 4f 52 45 3a 00		SCORE_MSG       .text 'SCORE:',0
->1607bb	4c 45 56 45 4c 3a 00		LEVEL_MSG       .text 'LEVEL:',0
->1607c2	42 4f 4e 55 53 3a 20 20		BONUS_MSG       .text 'BONUS:  ',0
->1607ca	00
->1607cb	4c 49 4e 45 53 3a 20 20		LINES_MSG       .text 'LINES:  ',0
->1607d3	00
->1607d4	00 00				BYTE_CNTR       .word 0
-.1607d6					BOARD
->1607d6	23				    .byte '#'
->1607d7	23				    .byte '#'
->1607d8	00				        .byte 0
->1607d9	00				        .byte 0
->1607da	00				        .byte 0
->1607db	00				        .byte 0
->1607dc	00				        .byte 0
->1607dd	00				        .byte 0
->1607de	00				        .byte 0
->1607df	00				        .byte 0
->1607e0	00				        .byte 0
->1607e1	00				        .byte 0
->1607e2	23				    .byte '#'
->1607e3	23				    .byte '#'
->1607e4	23				    .byte '#'
->1607e5	23				    .byte '#'
->1607e6	00				        .byte 0
->1607e7	00				        .byte 0
->1607e8	00				        .byte 0
->1607e9	00				        .byte 0
->1607ea	00				        .byte 0
->1607eb	00				        .byte 0
->1607ec	00				        .byte 0
->1607ed	00				        .byte 0
->1607ee	00				        .byte 0
->1607ef	00				        .byte 0
->1607f0	23				    .byte '#'
->1607f1	23				    .byte '#'
->1607f2	23				    .byte '#'
->1607f3	23				    .byte '#'
->1607f4	00				        .byte 0
->1607f5	00				        .byte 0
->1607f6	00				        .byte 0
->1607f7	00				        .byte 0
->1607f8	00				        .byte 0
->1607f9	00				        .byte 0
->1607fa	00				        .byte 0
->1607fb	00				        .byte 0
->1607fc	00				        .byte 0
->1607fd	00				        .byte 0
->1607fe	23				    .byte '#'
->1607ff	23				    .byte '#'
->160800	23				    .byte '#'
->160801	23				    .byte '#'
->160802	00				        .byte 0
->160803	00				        .byte 0
->160804	00				        .byte 0
->160805	00				        .byte 0
->160806	00				        .byte 0
->160807	00				        .byte 0
->160808	00				        .byte 0
->160809	00				        .byte 0
->16080a	00				        .byte 0
->16080b	00				        .byte 0
->16080c	23				    .byte '#'
->16080d	23				    .byte '#'
->16080e	23				    .byte '#'
->16080f	23				    .byte '#'
->160810	00				        .byte 0
->160811	00				        .byte 0
->160812	00				        .byte 0
->160813	00				        .byte 0
->160814	00				        .byte 0
->160815	00				        .byte 0
->160816	00				        .byte 0
->160817	00				        .byte 0
->160818	00				        .byte 0
->160819	00				        .byte 0
->16081a	23				    .byte '#'
->16081b	23				    .byte '#'
->16081c	23				    .byte '#'
->16081d	23				    .byte '#'
->16081e	00				        .byte 0
->16081f	00				        .byte 0
->160820	00				        .byte 0
->160821	00				        .byte 0
->160822	00				        .byte 0
->160823	00				        .byte 0
->160824	00				        .byte 0
->160825	00				        .byte 0
->160826	00				        .byte 0
->160827	00				        .byte 0
->160828	23				    .byte '#'
->160829	23				    .byte '#'
->16082a	23				    .byte '#'
->16082b	23				    .byte '#'
->16082c	00				        .byte 0
->16082d	00				        .byte 0
->16082e	00				        .byte 0
->16082f	00				        .byte 0
->160830	00				        .byte 0
->160831	00				        .byte 0
->160832	00				        .byte 0
->160833	00				        .byte 0
->160834	00				        .byte 0
->160835	00				        .byte 0
->160836	23				    .byte '#'
->160837	23				    .byte '#'
->160838	23				    .byte '#'
->160839	23				    .byte '#'
->16083a	00				        .byte 0
->16083b	00				        .byte 0
->16083c	00				        .byte 0
->16083d	00				        .byte 0
->16083e	00				        .byte 0
->16083f	00				        .byte 0
->160840	00				        .byte 0
->160841	00				        .byte 0
->160842	00				        .byte 0
->160843	00				        .byte 0
->160844	23				    .byte '#'
->160845	23				    .byte '#'
->160846	23				    .byte '#'
->160847	23				    .byte '#'
->160848	00				        .byte 0
->160849	00				        .byte 0
->16084a	00				        .byte 0
->16084b	00				        .byte 0
->16084c	00				        .byte 0
->16084d	00				        .byte 0
->16084e	00				        .byte 0
->16084f	00				        .byte 0
->160850	00				        .byte 0
->160851	00				        .byte 0
->160852	23				    .byte '#'
->160853	23				    .byte '#'
->160854	23				    .byte '#'
->160855	23				    .byte '#'
->160856	00				        .byte 0
->160857	00				        .byte 0
->160858	00				        .byte 0
->160859	00				        .byte 0
->16085a	00				        .byte 0
->16085b	00				        .byte 0
->16085c	00				        .byte 0
->16085d	00				        .byte 0
->16085e	00				        .byte 0
->16085f	00				        .byte 0
->160860	23				    .byte '#'
->160861	23				    .byte '#'
->160862	23				    .byte '#'
->160863	23				    .byte '#'
->160864	00				        .byte 0
->160865	00				        .byte 0
->160866	00				        .byte 0
->160867	00				        .byte 0
->160868	00				        .byte 0
->160869	00				        .byte 0
->16086a	00				        .byte 0
->16086b	00				        .byte 0
->16086c	00				        .byte 0
->16086d	00				        .byte 0
->16086e	23				    .byte '#'
->16086f	23				    .byte '#'
->160870	23				    .byte '#'
->160871	23				    .byte '#'
->160872	00				        .byte 0
->160873	00				        .byte 0
->160874	00				        .byte 0
->160875	00				        .byte 0
->160876	00				        .byte 0
->160877	00				        .byte 0
->160878	00				        .byte 0
->160879	00				        .byte 0
->16087a	00				        .byte 0
->16087b	00				        .byte 0
->16087c	23				    .byte '#'
->16087d	23				    .byte '#'
->16087e	23				    .byte '#'
->16087f	23				    .byte '#'
->160880	00				        .byte 0
->160881	00				        .byte 0
->160882	00				        .byte 0
->160883	00				        .byte 0
->160884	00				        .byte 0
->160885	00				        .byte 0
->160886	00				        .byte 0
->160887	00				        .byte 0
->160888	00				        .byte 0
->160889	00				        .byte 0
->16088a	23				    .byte '#'
->16088b	23				    .byte '#'
->16088c	23				    .byte '#'
->16088d	23				    .byte '#'
->16088e	00				        .byte 0
->16088f	00				        .byte 0
->160890	00				        .byte 0
->160891	00				        .byte 0
->160892	00				        .byte 0
->160893	00				        .byte 0
->160894	00				        .byte 0
->160895	00				        .byte 0
->160896	00				        .byte 0
+.1600a8					GAME_START
+.1600a8	e2 20		sep #$20	                SEP #$20        ; set A short
+.1600aa	c2 10		rep #$10	                REP #$10        ; set X long
+.1600ac	a9 00		lda #$00	                LDA #0
+.1600ae	8d 87 0f	sta $0f87	                STA KEYBOARD_SC_FLG
+.1600b1	c2 20		rep #$20	                REP #$20        ; set A long
+.1600b3	22 b0 10 00	jsl $0010b0	                JSL INITSUPERIO
+.1600b7	a9 06 00	lda #$0006	                LDA #6
+.1600ba	8f 84 e8 af	sta $afe884	                STA GABE_RNG_SEED_LO ; set the max value from 0 to 6
+.1600be	8f 9a 00 16	sta $16009a	                STA PIECE_X
+.1600c2	22 b4 10 00	jsl $0010b4	                JSL INITKEYBOARD
+.1600c6	e2 20		sep #$20	                SEP #$20        ; set A short
+.1600c8	20 da 06	jsr $1606da	                JSR LOAD_GAME_ASSETS
+.1600cb	a9 00		lda #$00	                LDA #0
+.1600cd	8d 87 0f	sta $0f87	                STA KEYBOARD_SC_FLG
+.1600d0					    NEXT_GAME
+.1600d0	20 68 07	jsr $160768	                JSR INIT_GAME
+.1600d3	22 a8 10 00	jsl $0010a8	                JSL CLRSCREEN
+.1600d7	a9 fe		lda #$fe	                LDA #~( FNX0_INT00_SOF )
+.1600d9	8f 4c 01 00	sta $00014c	                STA @lINT_MASK_REG0
+.1600dd	a9 fe		lda #$fe	                LDA #~( FNX1_INT00_KBD )
+.1600df	8f 4d 01 00	sta $00014d	                STA @lINT_MASK_REG1
+.1600e3	a9 01		lda #$01	                LDA #1
+.1600e5	8f 86 e8 af	sta $afe886	                STA GABE_RNG_CTRL
+.1600e9	20 a3 01	jsr $1601a3	                JSR PICK_NEXT_PIECE
+.1600ec	58		cli		                CLI
+.1600ed					    INFINITE_LOOP
+.1600ed	ea		nop		                NOP
+.1600ee	ea		nop		                NOP
+.1600ef	ea		nop		                NOP
+.1600f0	af a6 00 16	lda $1600a6	                LDA GAME_STATE
+.1600f4	c9 02		cmp #$02	                CMP #2
+.1600f6	f0 d8		beq $1600d0	                BEQ NEXT_GAME
+.1600f8	80 f3		bra $1600ed	                BRA INFINITE_LOOP
+.1600fa					DISPLAY_BOARD_LOOP
+.1600fa	af 94 00 16	lda $160094	                LDA TICK_COUNT
+.1600fe	1a		inc a		                INC A
+.1600ff	8f 94 00 16	sta $160094	                STA TICK_COUNT
+.160103	cf a0 00 16	cmp $1600a0	                CMP GAME_SPEED
+.160107	d0 0f		bne $160118	                BNE TIMING_DONE
+.160109	af 9c 00 16	lda $16009c	                LDA PIECE_Y
+.16010d	1a		inc a		                INC A
+.16010e	8f 9c 00 16	sta $16009c	                STA PIECE_Y
+.160112	a9 00		lda #$00	                LDA #0
+.160114	8f 94 00 16	sta $160094	                STA TICK_COUNT
+.160118					    TIMING_DONE
+.160118	20 e5 03	jsr $1603e5	                JSR DOES_PIECE_FIT
+.16011b	af 9f 00 16	lda $16009f	                LDA PIECE_FIT
+.16011f	f0 72		beq $160193	                BEQ LOGIC_DONE
+.160121	af 9c 00 16	lda $16009c	                LDA PIECE_Y
+.160125	d0 03		bne $16012a	                BNE NOT_GAME_OVER
+.160127	4c e6 05	jmp $1605e6	                JMP GAME_OVER
+.16012a					        NOT_GAME_OVER
+.16012a	20 92 03	jsr $160392	                JSR COPY_PIECE
+.16012d	c2 20		rep #$20	                REP #$20        ; set A long
+.16012f	f8		sed		                SED
+.160130	18		clc		                CLC
+.160131	af a2 00 16	lda $1600a2	                LDA SCORE
+.160135	69 25 00	adc #$0025	                ADC #PIECE_VALUE
+.160138	8f a2 00 16	sta $1600a2	                STA SCORE
+.16013c	d8		cld		                CLD
+.16013d	e2 20		sep #$20	                SEP #$20        ; set A short
+.16013f	90 09		bcc $16014a	                BCC NG_CONTINUE
+.160141	af a4 00 16	lda $1600a4	                LDA SCORE+2
+.160145	1a		inc a		                INC A
+.160146	8f a4 00 16	sta $1600a4	                STA SCORE+2
+.16014a					        NG_CONTINUE
+.16014a	20 c6 01	jsr $1601c6	                JSR LOOK_FOR_LINES
+.16014d	a9 06		lda #$06	                LDA #6
+.16014f	8f 9a 00 16	sta $16009a	                STA PIECE_X
+.160153	a9 00		lda #$00	                LDA #0
+.160155	8f 9c 00 16	sta $16009c	                STA PIECE_Y
+.160159	8f 9f 00 16	sta $16009f	                STA PIECE_FIT
+.16015d	8f 9e 00 16	sta $16009e	                STA PIECE_ROT
+.160161	8f 94 00 16	sta $160094	                STA TICK_COUNT
+.160165	20 a3 01	jsr $1601a3	                JSR PICK_NEXT_PIECE
+.160168	af a1 00 16	lda $1600a1	                LDA PIECE_CNTR
+.16016c	1a		inc a		                INC A
+.16016d	8f a1 00 16	sta $1600a1	                STA PIECE_CNTR
+.160171	c9 0a		cmp #$0a	                CMP #10
+.160173	d0 1e		bne $160193	                BNE LOGIC_DONE
+.160175	a9 00		lda #$00	                LDA #0
+.160177	8f a1 00 16	sta $1600a1	                STA PIECE_CNTR
+.16017b	f8		sed		                SED
+.16017c	18		clc		                CLC
+.16017d	af a7 00 16	lda $1600a7	                LDA LEVEL
+.160181	69 01		adc #$01	                ADC #1
+.160183	8f a7 00 16	sta $1600a7	                STA LEVEL
+.160187	d8		cld		                CLD
+.160188	af a0 00 16	lda $1600a0	                LDA GAME_SPEED
+.16018c	38		sec		                SEC
+.16018d	e9 02		sbc #$02	                SBC #2
+.16018f	8f a0 00 16	sta $1600a0	                STA GAME_SPEED
+.160193					    LOGIC_DONE
+.160193	20 3f 04	jsr $16043f	                JSR DRAW_BOARD
+.160196	20 8b 04	jsr $16048b	                JSR DRAW_PIECE
+.160199	20 e5 04	jsr $1604e5	                JSR DRAW_SCORE
+.16019c	20 0e 05	jsr $16050e	                JSR DRAW_LEVEL
+.16019f	20 2e 05	jsr $16052e	                JSR DRAW_LINES
+.1601a2	60		rts		                RTS
+.1601a3					PICK_NEXT_PIECE
+.1601a3	af 84 e8 af	lda $afe884	                LDA GABE_RNG_DAT_LO
+.1601a7	29 07		and #$07	                AND #7
+.1601a9	8f 99 00 16	sta $160099	                STA CURRENT_PIECE
+.1601ad	c9 07		cmp #$07	                CMP #7
+.1601af	f0 f2		beq $1601a3	                BEQ PICK_NEXT_PIECE
+.1601b1	60		rts		                RTS
+.1601b2					DISPLAY_SYMBOL
+.1601b2	87 17		sta [$17]	                STA [CURSORPOS]
+.1601b4	c2 20		rep #$20	                REP #$20        ; set A long
+.1601b6	a5 17		lda $17		                LDA CURSORPOS
+.1601b8	18		clc		                CLC
+.1601b9	69 00 20	adc #$2000	                ADC #$2000
+.1601bc	85 1f		sta $1f		                STA COLORPOS
+.1601be	e2 20		sep #$20	                SEP #$20        ; set A short
+.1601c0	a5 1e		lda $1e		                LDA CURCOLOR
+.1601c2	87 1f		sta [$1f]	                STA [COLORPOS]
+.1601c4	60		rts		                RTS
+.1601c5					INVALID_KEY
+.1601c5	60		rts		                RTS
+.1601c6					LOOK_FOR_LINES
+.1601c6	64 63		stz $63		                STZ ROT_VAL2 ; line count max 4
+.1601c8	64 64		stz $64		                STZ LINE_CNTR
+.1601ca					    INIT_LINE_CHECK
+.1601ca	a0 00 00	ldy #$0000	                LDY #0
+.1601cd	64 62		stz $62		                STZ ROT_VAL  ; column count max 10
+.1601cf	c2 20		rep #$20	                REP #$20        ; set A long
+.1601d1	af 9c 00 16	lda $16009c	                LDA PIECE_Y
+.1601d5	3a		dec a		                DEC A
+.1601d6	8d 00 01	sta $0100	                STA UNSIGNED_MULT_A
+.1601d9	a9 0e 00	lda #$000e	                LDA #BOARD_WIDTH
+.1601dc	8d 02 01	sta $0102	                STA UNSIGNED_MULT_B
+.1601df	ad 04 01	lda $0104	                LDA UNSIGNED_MULT_RESULT
+.1601e2	aa		tax		                TAX
+.1601e3	e2 20		sep #$20	                SEP #$20        ; set A short
+.1601e5					    CHK_NEXT_COL
+.1601e5	bf 95 08 16	lda $160895,x	                LDA BOARD,X
+.1601e9	f0 0f		beq $1601fa	                BEQ CHK_NEXT_LINE
+.1601eb	e6 62		inc $62		                INC ROT_VAL
+.1601ed	e8		inx		                INX
+.1601ee	c8		iny		                INY
+.1601ef	c0 0e 00	cpy #$000e	                CPY #BOARD_WIDTH
+.1601f2	d0 f1		bne $1601e5	                BNE CHK_NEXT_COL
+.1601f4	a5 62		lda $62		                LDA ROT_VAL
+.1601f6	c9 0e		cmp #$0e	                CMP #BOARD_WIDTH
+.1601f8	f0 16		beq $160210	                BEQ LINE_FOUND
+.1601fa					    CHK_NEXT_LINE
+.1601fa	e6 63		inc $63		                INC ROT_VAL2
+.1601fc	af 9c 00 16	lda $16009c	                LDA PIECE_Y
+.160200	1a		inc a		                INC A
+.160201	8f 9c 00 16	sta $16009c	                STA PIECE_Y
+.160205	c9 15		cmp #$15	                CMP #BOARD_HEIGHT
+.160207	f0 06		beq $16020f	                BEQ LOOK_LINE_DONE
+.160209	a5 63		lda $63		                LDA ROT_VAL2
+.16020b	c9 04		cmp #$04	                CMP #4
+.16020d	d0 bb		bne $1601ca	                BNE INIT_LINE_CHECK
+.16020f					    LOOK_LINE_DONE
+.16020f	60		rts		                RTS
+.160210					    LINE_FOUND
+.160210	e6 64		inc $64		                INC LINE_CNTR
+.160212	a9 03		lda #$03	                LDA #3
+.160214	8f a6 00 16	sta $1600a6	                STA GAME_STATE
+.160218	c2 20		rep #$20	                REP #$20        ; set A long
+.16021a	af 9c 00 16	lda $16009c	                LDA PIECE_Y
+.16021e	3a		dec a		                DEC A
+.16021f	8d 00 01	sta $0100	                STA UNSIGNED_MULT_A
+.160222	a9 0e 00	lda #$000e	                LDA #BOARD_WIDTH
+.160225	8d 02 01	sta $0102	                STA UNSIGNED_MULT_B
+.160228	ad 04 01	lda $0104	                LDA UNSIGNED_MULT_RESULT
+.16022b	aa		tax		                TAX
+.16022c	e2 20		sep #$20	                SEP #$20        ; set A short
+.16022e	e8		inx		                INX
+.16022f	e8		inx		                INX ; skip the first two columns
+.160230	a0 00 00	ldy #$0000	                LDY #0
+.160233	a9 09		lda #$09	                LDA #9
+.160235	9f 95 08 16	sta $160895,x	                STA BOARD,X
+.160239	e8		inx		                INX
+.16023a	c8		iny		                INY
+.16023b	a9 0a		lda #$0a	                LDA #10
+.16023d					        LINE_CHAR
+.16023d	9f 95 08 16	sta $160895,x	                STA BOARD,X
+.160241	e8		inx		                INX
+.160242	c8		iny		                INY
+.160243	c0 09 00	cpy #$0009	                CPY #BOARD_WIDTH-5
+.160246	d0 f5		bne $16023d	                BNE LINE_CHAR
+.160248	a9 0b		lda #$0b	                LDA #11
+.16024a	9f 95 08 16	sta $160895,x	                STA BOARD,X
+.16024e	80 aa		bra $1601fa	                BRA CHK_NEXT_LINE
+.160250					GET_PIECE_VALUE
+.160250	a9 00		lda #$00	                LDA #0
+.160252	eb		xba		                XBA
+.160253	af 9e 00 16	lda $16009e	                LDA PIECE_ROT
+.160257	d0 05		bne $16025e	                BNE ROT_NEXT
+.160259	bf 25 08 16	lda $160825,x	                LDA PIECE0,X  ; ROTATION 0
+.16025d	60		rts		                RTS
+.16025e					    ROT_NEXT
+.16025e	c9 01		cmp #$01	                CMP #1
+.160260	d0 2b		bne $16028d	                BNE ROT_2
+.160262	da		phx		                PHX
+.160263	8a		txa		                TXA
+.160264	29 f0		and #$f0	                AND #$F0
+.160266	85 63		sta $63		                STA ROT_VAL2
+.160268	8a		txa		                TXA
+.160269	29 03		and #$03	                AND #3
+.16026b	aa		tax		                TAX
+.16026c	38		sec		                SEC
+.16026d	a9 0c		lda #$0c	                LDA #12       ; ROTATION 1
+.16026f					        CMP_R1
+.16026f	e0 00 00	cpx #$0000	                CPX #0
+.160272	f0 05		beq $160279	                BEQ R1_DONE
+.160274	e9 04		sbc #$04	                SBC #4
+.160276	ca		dex		                DEX
+.160277	80 f6		bra $16026f	                BRA CMP_R1
+.160279					        R1_DONE
+.160279	85 62		sta $62		                STA ROT_VAL
+.16027b	a3 01		lda $01,s	                LDA 1,S
+.16027d	4a		lsr a		                LSR A
+.16027e	4a		lsr a		                LSR A
+.16027f	29 03		and #$03	                AND #3
+.160281	18		clc		                CLC
+.160282	65 62		adc $62		                ADC ROT_VAL
+.160284	65 63		adc $63		                ADC ROT_VAL2
+.160286	aa		tax		                TAX
+.160287	bf 25 08 16	lda $160825,x	                LDA PIECE0,X  ; ROTATION 1
+.16028b	fa		plx		                PLX
+.16028c	60		rts		                RTS
+.16028d					    ROT_2
+.16028d	c9 02		cmp #$02	                CMP #2
+.16028f	d0 1a		bne $1602ab	                BNE ROT_3
+.160291	da		phx		                PHX
+.160292	8a		txa		                TXA
+.160293	29 f0		and #$f0	                AND #$F0
+.160295	85 63		sta $63		                STA ROT_VAL2
+.160297	8a		txa		                TXA
+.160298	29 0f		and #$0f	                AND #$F
+.16029a	85 62		sta $62		                STA ROT_VAL
+.16029c	38		sec		                SEC
+.16029d	a9 0f		lda #$0f	                LDA #$F
+.16029f	e5 62		sbc $62		                SBC ROT_VAL
+.1602a1	18		clc		                CLC
+.1602a2	65 63		adc $63		                ADC ROT_VAL2
+.1602a4	aa		tax		                TAX
+.1602a5	bf 25 08 16	lda $160825,x	                LDA PIECE0,X  ; ROTATION 2
+.1602a9	fa		plx		                PLX
+.1602aa	60		rts		                RTS
+.1602ab					    ROT_3
+.1602ab	da		phx		                PHX
+.1602ac	8a		txa		                TXA
+.1602ad	29 f0		and #$f0	                AND #$F0
+.1602af	85 63		sta $63		                STA ROT_VAL2
+.1602b1	8a		txa		                TXA
+.1602b2	29 0c		and #$0c	                AND #$C
+.1602b4	4a		lsr a		                LSR A
+.1602b5	4a		lsr a		                LSR A
+.1602b6	85 62		sta $62		                STA ROT_VAL
+.1602b8	a3 01		lda $01,s	                LDA 1,S
+.1602ba	29 03		and #$03	                AND #3
+.1602bc	aa		tax		                TAX
+.1602bd	a9 03		lda #$03	                LDA #3       ; ROTATION 3
+.1602bf					        CMP_R3
+.1602bf	e0 00 00	cpx #$0000	                CPX #0
+.1602c2	f0 06		beq $1602ca	                BEQ R3_DONE
+.1602c4	18		clc		                CLC
+.1602c5	69 04		adc #$04	                ADC #4
+.1602c7	ca		dex		                DEX
+.1602c8	80 f5		bra $1602bf	                BRA CMP_R3
+.1602ca					        R3_DONE
+.1602ca	38		sec		                SEC
+.1602cb	e5 62		sbc $62		                SBC ROT_VAL
+.1602cd	18		clc		                CLC
+.1602ce	65 63		adc $63		                ADC ROT_VAL2
+.1602d0	aa		tax		                TAX
+.1602d1	bf 25 08 16	lda $160825,x	                LDA PIECE0,X  ; ROTATION 3
+.1602d5	fa		plx		                PLX
+.1602d6	60		rts		                RTS
+.1602d7					MOVE_PIECE_LEFT
+.1602d7	af a6 00 16	lda $1600a6	                LDA GAME_STATE
+.1602db	c9 01		cmp #$01	                CMP #1 ; user pressed the space bar to restart the game
+.1602dd	f0 21		beq $160300	                BEQ MOVE_LEFT_DONE
+.1602df	af 9a 00 16	lda $16009a	                LDA PIECE_X
+.1602e3	3a		dec a		                DEC A
+.1602e4	8f 9a 00 16	sta $16009a	                STA PIECE_X
+.1602e8	20 e5 03	jsr $1603e5	                JSR DOES_PIECE_FIT
+.1602eb	af 9f 00 16	lda $16009f	                LDA PIECE_FIT
+.1602ef	f0 0f		beq $160300	                BEQ MOVE_LEFT_DONE
+.1602f1	af 9a 00 16	lda $16009a	                LDA PIECE_X
+.1602f5	1a		inc a		                INC A
+.1602f6	8f 9a 00 16	sta $16009a	                STA PIECE_X
+.1602fa	a9 00		lda #$00	                LDA #0
+.1602fc	8f 9f 00 16	sta $16009f	                STA PIECE_FIT
+.160300					    MOVE_LEFT_DONE
+.160300	60		rts		                RTS
+.160301					MOVE_PIECE_RIGHT
+.160301	af a6 00 16	lda $1600a6	                LDA GAME_STATE
+.160305	c9 01		cmp #$01	                CMP #1 ; user pressed the space bar to restart the game
+.160307	f0 21		beq $16032a	                BEQ MOVE_RIGHT_DONE
+.160309	af 9a 00 16	lda $16009a	                LDA PIECE_X
+.16030d	1a		inc a		                INC A
+.16030e	8f 9a 00 16	sta $16009a	                STA PIECE_X
+.160312	20 e5 03	jsr $1603e5	                JSR DOES_PIECE_FIT
+.160315	af 9f 00 16	lda $16009f	                LDA PIECE_FIT
+.160319	f0 0f		beq $16032a	                BEQ MOVE_RIGHT_DONE
+.16031b	af 9a 00 16	lda $16009a	                LDA PIECE_X
+.16031f	3a		dec a		                DEC A
+.160320	8f 9a 00 16	sta $16009a	                STA PIECE_X
+.160324	a9 00		lda #$00	                LDA #0
+.160326	8f 9f 00 16	sta $16009f	                STA PIECE_FIT
+.16032a					    MOVE_RIGHT_DONE
+.16032a	60		rts		                RTS
+.16032b					MOVE_PIECE_DOWN
+.16032b	af a6 00 16	lda $1600a6	                LDA GAME_STATE
+.16032f	c9 01		cmp #$01	                CMP #1 ; user pressed the space bar to restart the game
+.160331	f0 21		beq $160354	                BEQ MOVE_DOWN_DONE
+.160333	af 9c 00 16	lda $16009c	                LDA PIECE_Y
+.160337	1a		inc a		                INC A
+.160338	8f 9c 00 16	sta $16009c	                STA PIECE_Y
+.16033c	20 e5 03	jsr $1603e5	                JSR DOES_PIECE_FIT
+.16033f	af 9f 00 16	lda $16009f	                LDA PIECE_FIT
+.160343	f0 0f		beq $160354	                BEQ MOVE_DOWN_DONE
+.160345	af 9c 00 16	lda $16009c	                LDA PIECE_Y
+.160349	3a		dec a		                DEC A
+.16034a	8f 9c 00 16	sta $16009c	                STA PIECE_Y
+.16034e	a9 00		lda #$00	                LDA #0
+.160350	8f 9f 00 16	sta $16009f	                STA PIECE_FIT
+.160354					    MOVE_DOWN_DONE
+.160354	60		rts		                RTS
+.160355					ROTATE_PIECE
+.160355	af a6 00 16	lda $1600a6	                LDA GAME_STATE
+.160359	c9 01		cmp #$01	                CMP #1 ; user pressed the space bar to restart the game
+.16035b	d0 07		bne $160364	                BNE ROT_START
+.16035d	a9 02		lda #$02	                LDA #2
+.16035f	8f a6 00 16	sta $1600a6	                STA GAME_STATE
+.160363	60		rts		                RTS
+.160364					    ROT_START
+.160364	af 9e 00 16	lda $16009e	                LDA PIECE_ROT
+.160368	1a		inc a		                INC A
+.160369	c9 04		cmp #$04	                CMP #4
+.16036b	d0 02		bne $16036f	                BNE ROTATE_CHECK_COLLISION
+.16036d	a9 00		lda #$00	                LDA #0
+.16036f					    ROTATE_CHECK_COLLISION
+.16036f	8f 9e 00 16	sta $16009e	                STA PIECE_ROT
+.160373	20 e5 03	jsr $1603e5	                JSR DOES_PIECE_FIT
+.160376	af 9f 00 16	lda $16009f	                LDA PIECE_FIT
+.16037a	f0 15		beq $160391	                BEQ ROTATE_DONE
+.16037c	a9 00		lda #$00	                LDA #0
+.16037e	8f 9f 00 16	sta $16009f	                STA PIECE_FIT
+.160382	af 9e 00 16	lda $16009e	                LDA PIECE_ROT
+.160386	f0 03		beq $16038b	                BEQ ROTATE_3
+.160388	3a		dec a		                DEC A
+.160389	80 02		bra $16038d	                BRA UNDO_ROT_COLISION
+.16038b					    ROTATE_3
+.16038b	a9 03		lda #$03	                LDA #3
+.16038d					    UNDO_ROT_COLISION
+.16038d	8f 9e 00 16	sta $16009e	                STA PIECE_ROT
+.160391					    ROTATE_DONE
+.160391	60		rts		                RTS
+.160392					COPY_PIECE
+.160392	af 99 00 16	lda $160099	                LDA CURRENT_PIECE
+.160396	0a		asl a		                ASL A
+.160397	0a		asl a		                ASL A
+.160398	0a		asl a		                ASL A
+.160399	0a		asl a		                ASL A
+.16039a	aa		tax		                TAX
+.16039b	c2 20		rep #$20	                REP #$20        ; set A long
+.16039d	af 9c 00 16	lda $16009c	                LDA PIECE_Y
+.1603a1	3a		dec a		                DEC A
+.1603a2	8d 00 01	sta $0100	                STA UNSIGNED_MULT_A
+.1603a5	a9 0e 00	lda #$000e	                LDA #BOARD_WIDTH
+.1603a8	8d 02 01	sta $0102	                STA UNSIGNED_MULT_B
+.1603ab	ad 04 01	lda $0104	                LDA UNSIGNED_MULT_RESULT
+.1603ae	18		clc		                CLC
+.1603af	6f 9a 00 16	adc $16009a	                ADC PIECE_X
+.1603b3	a8		tay		                TAY
+.1603b4	a9 00 00	lda #$0000	                LDA #0
+.1603b7	e2 20		sep #$20	                SEP #$20        ; set A short
+.1603b9					    NEXT_COPY
+.1603b9	20 50 02	jsr $160250	                JSR GET_PIECE_VALUE
+.1603bc	c9 00		cmp #$00	                CMP #0
+.1603be	f0 0e		beq $1603ce	                BEQ SKIP_COPY
+.1603c0	da		phx		                PHX
+.1603c1	bb		tyx		                TYX
+.1603c2	18		clc		                CLC
+.1603c3	af 99 00 16	lda $160099	                LDA CURRENT_PIECE
+.1603c7	69 02		adc #$02	                ADC #2
+.1603c9	9f 95 08 16	sta $160895,x	                STA BOARD,X
+.1603cd	fa		plx		                PLX
+.1603ce					        SKIP_COPY
+.1603ce	e8		inx		                INX
+.1603cf	c8		iny		                INY
+.1603d0	8a		txa		                TXA
+.1603d1	29 03		and #$03	                AND #3
+.1603d3	d0 e4		bne $1603b9	                BNE NEXT_COPY
+.1603d5	c2 20		rep #$20	                REP #$20        ; set A long
+.1603d7	98		tya		                TYA
+.1603d8	18		clc		                CLC
+.1603d9	69 0a 00	adc #$000a	                ADC #BOARD_WIDTH-4
+.1603dc	a8		tay		                TAY
+.1603dd	e2 20		sep #$20	                SEP #$20        ; set A short
+.1603df	8a		txa		                TXA
+.1603e0	29 0f		and #$0f	                AND #$F
+.1603e2	d0 d5		bne $1603b9	                BNE NEXT_COPY
+.1603e4	60		rts		                RTS
+.1603e5					DOES_PIECE_FIT
+.1603e5	a9 00		lda #$00	                LDA #0
+.1603e7	eb		xba		                XBA
+.1603e8	af 99 00 16	lda $160099	                LDA CURRENT_PIECE
+.1603ec	0a		asl a		                ASL A
+.1603ed	0a		asl a		                ASL A
+.1603ee	0a		asl a		                ASL A
+.1603ef	0a		asl a		                ASL A
+.1603f0	aa		tax		                TAX
+.1603f1	c2 20		rep #$20	                REP #$20        ; set A long
+.1603f3	af 9c 00 16	lda $16009c	                LDA PIECE_Y
+.1603f7	8d 00 01	sta $0100	                STA UNSIGNED_MULT_A
+.1603fa	a9 0e 00	lda #$000e	                LDA #BOARD_WIDTH
+.1603fd	8d 02 01	sta $0102	                STA UNSIGNED_MULT_B
+.160400	ad 04 01	lda $0104	                LDA UNSIGNED_MULT_RESULT
+.160403	18		clc		                CLC
+.160404	6f 9a 00 16	adc $16009a	                ADC PIECE_X
+.160408	a8		tay		                TAY
+.160409	a9 00 00	lda #$0000	                LDA #0
+.16040c	e2 20		sep #$20	                SEP #$20        ; set A short
+.16040e					    NEXT_COLLISION
+.16040e	20 50 02	jsr $160250	                JSR GET_PIECE_VALUE
+.160411	c9 00		cmp #$00	                CMP #0
+.160413	f0 0b		beq $160420	                BEQ SKIP_BYTE
+.160415	da		phx		                PHX
+.160416	bb		tyx		                TYX
+.160417	bf 95 08 16	lda $160895,x	                LDA BOARD,X
+.16041b	fa		plx		                PLX
+.16041c	c9 00		cmp #$00	                CMP #0
+.16041e	d0 18		bne $160438	                BNE OCCUPIED
+.160420					    SKIP_BYTE
+.160420	e8		inx		                INX
+.160421	c8		iny		                INY
+.160422	8a		txa		                TXA
+.160423	29 03		and #$03	                AND #3
+.160425	d0 e7		bne $16040e	                BNE NEXT_COLLISION
+.160427	c2 20		rep #$20	                REP #$20        ; set A long
+.160429	98		tya		                TYA
+.16042a	18		clc		                CLC
+.16042b	69 0a 00	adc #$000a	                ADC #BOARD_WIDTH-4
+.16042e	a8		tay		                TAY
+.16042f	e2 20		sep #$20	                SEP #$20        ; set A short
+.160431	8a		txa		                TXA
+.160432	29 0f		and #$0f	                AND #$F
+.160434	d0 d8		bne $16040e	                BNE NEXT_COLLISION
+.160436	80 06		bra $16043e	                BRA PF_DONE
+.160438					    OCCUPIED
+.160438	a9 01		lda #$01	                LDA #1
+.16043a	8f 9f 00 16	sta $16009f	                STA PIECE_FIT
+.16043e					    PF_DONE
+.16043e	60		rts		                RTS
+.16043f					DRAW_BOARD
+.16043f	a2 4d 51	ldx #$514d	                LDX #START_BOARD
+.160442	86 17		stx $17		                STX CURSORPOS
+.160444	a2 00 00	ldx #$0000	                LDX #0
+.160447	a9 00		lda #$00	                LDA #0
+.160449	8f 98 00 16	sta $160098	                STA BOARDY
+.16044d					    NEXT_ROW
+.16044d	a9 00		lda #$00	                LDA #0
+.16044f	8f 97 00 16	sta $160097	                STA BOARDX
+.160453					        NEXT_SYMBOL
+.160453	bf 95 08 16	lda $160895,x	                LDA BOARD,X
+.160457	c9 23		cmp #$23	                CMP #'#'
+.160459	d0 04		bne $16045f	                BNE SKIP_DR_BRD
+.16045b	a9 01		lda #$01	                LDA #1
+.16045d	80 00		bra $16045f	                BRA DISPLAY_BLOCK
+.16045f					            SKIP_DR_BRD
+.16045f					            DISPLAY_BLOCK
+.16045f	87 17		sta [$17]	                STA [CURSORPOS]
+.160461	e8		inx		                INX
+.160462	e6 17		inc $17		                INC CURSORPOS
+.160464	af 97 00 16	lda $160097	                LDA BOARDX
+.160468	1a		inc a		                INC A
+.160469	8f 97 00 16	sta $160097	                STA BOARDX
+.16046d	c9 0e		cmp #$0e	                CMP #BOARD_WIDTH
+.16046f	d0 e2		bne $160453	                BNE NEXT_SYMBOL
+.160471	c2 20		rep #$20	                REP #$20        ; set A long
+.160473	a5 17		lda $17		                LDA CURSORPOS
+.160475	18		clc		                CLC
+.160476	69 32 00	adc #$0032	                ADC #$40-BOARD_WIDTH
+.160479	85 17		sta $17		                STA CURSORPOS
+.16047b	e2 20		sep #$20	                SEP #$20        ; set A short
+.16047d	af 98 00 16	lda $160098	                LDA BOARDY
+.160481	1a		inc a		                INC A
+.160482	8f 98 00 16	sta $160098	                STA BOARDY
+.160486	c9 15		cmp #$15	                CMP #BOARD_HEIGHT
+.160488	d0 c3		bne $16044d	                BNE NEXT_ROW
+.16048a	60		rts		                RTS
+.16048b					DRAW_PIECE
+.16048b	c2 20		rep #$20	                REP #$20        ; set A long
+.16048d	a9 4d 51	lda #$514d	                LDA #START_BOARD
+.160490	18		clc		                CLC
+.160491	6f 9a 00 16	adc $16009a	                ADC PIECE_X
+.160495	85 17		sta $17		                STA CURSORPOS
+.160497	a9 40 00	lda #$0040	                LDA #64
+.16049a	8d 00 01	sta $0100	                STA UNSIGNED_MULT_A
+.16049d	af 9c 00 16	lda $16009c	                LDA PIECE_Y
+.1604a1	8d 02 01	sta $0102	                STA UNSIGNED_MULT_B
+.1604a4	ad 04 01	lda $0104	                LDA UNSIGNED_MULT_RESULT
+.1604a7	18		clc		                CLC
+.1604a8	65 17		adc $17		                ADC CURSORPOS
+.1604aa	85 17		sta $17		                STA CURSORPOS
+.1604ac	e2 20		sep #$20	                SEP #$20        ; set A short
+.1604ae	a9 00		lda #$00	                LDA #0
+.1604b0	eb		xba		                XBA
+.1604b1	af 99 00 16	lda $160099	                LDA CURRENT_PIECE
+.1604b5	0a		asl a		                ASL A
+.1604b6	0a		asl a		                ASL A
+.1604b7	0a		asl a		                ASL A
+.1604b8	0a		asl a		                ASL A
+.1604b9	aa		tax		                TAX
+.1604ba					        NEXT_PIECE_SYMBOL
+.1604ba	20 50 02	jsr $160250	                JSR GET_PIECE_VALUE
+.1604bd	c9 00		cmp #$00	                CMP #0
+.1604bf	f0 09		beq $1604ca	                BEQ SKIP_DRAW
+.1604c1	af 99 00 16	lda $160099	                LDA CURRENT_PIECE
+.1604c5	18		clc		                CLC
+.1604c6	69 02		adc #$02	                ADC #2
+.1604c8	87 17		sta [$17]	                STA [CURSORPOS]
+.1604ca					        SKIP_DRAW
+.1604ca	e8		inx		                INX
+.1604cb	e6 17		inc $17		                INC CURSORPOS
+.1604cd	8a		txa		                TXA
+.1604ce	29 03		and #$03	                AND #3
+.1604d0	d0 e8		bne $1604ba	                BNE NEXT_PIECE_SYMBOL
+.1604d2	c2 20		rep #$20	                REP #$20        ; set A long
+.1604d4	a5 17		lda $17		                LDA CURSORPOS
+.1604d6	18		clc		                CLC
+.1604d7	69 3c 00	adc #$003c	                ADC #$40-4
+.1604da	85 17		sta $17		                STA CURSORPOS
+.1604dc	8a		txa		                TXA
+.1604dd	29 0f 00	and #$000f	                AND #$F
+.1604e0	e2 20		sep #$20	                SEP #$20        ; set A short
+.1604e2	d0 d6		bne $1604ba	                BNE NEXT_PIECE_SYMBOL
+.1604e4	60		rts		                RTS
+.1604e5					DRAW_SCORE
+.1604e5	a0 b8 a2	ldy #$a2b8	                LDY #$A000 + 128*5 + 56
+.1604e8	84 17		sty $17		                STY CURSORPOS
+.1604ea	a9 20		lda #$20	                LDA #$20
+.1604ec	85 1e		sta $1e		                STA CURCOLOR
+.1604ee	a0 03 08	ldy #$0803	                LDY #<>SCORE_MSG
+.1604f1	84 60		sty $60		                STY MSG_ADDR
+.1604f3	20 cc 05	jsr $1605cc	                JSR DISPLAY_MSG
+.1604f6	e6 17		inc $17		                INC CURSORPOS
+.1604f8	af a4 00 16	lda $1600a4	                LDA SCORE + 2
+.1604fc	20 66 06	jsr $160666	                JSR DISPLAY_HEX
+.1604ff	af a3 00 16	lda $1600a3	                LDA SCORE + 1
+.160503	20 66 06	jsr $160666	                JSR DISPLAY_HEX
+.160506	af a2 00 16	lda $1600a2	                LDA SCORE
+.16050a	20 66 06	jsr $160666	                JSR DISPLAY_HEX
+.16050d	60		rts		                RTS
+.16050e					DRAW_LEVEL
+.16050e	a0 b8 a3	ldy #$a3b8	                LDY #$A000 + 128*7 + 56
+.160511	84 17		sty $17		                STY CURSORPOS
+.160513	a9 20		lda #$20	                LDA #$20
+.160515	85 1e		sta $1e		                STA CURCOLOR
+.160517	a0 0a 08	ldy #$080a	                LDY #<>LEVEL_MSG
+.16051a	84 60		sty $60		                STY MSG_ADDR
+.16051c	20 cc 05	jsr $1605cc	                JSR DISPLAY_MSG
+.16051f	18		clc		                CLC
+.160520	a5 17		lda $17		                LDA CURSORPOS
+.160522	69 05		adc #$05	                ADC #5
+.160524	85 17		sta $17		                STA CURSORPOS
+.160526	af a7 00 16	lda $1600a7	                LDA LEVEL
+.16052a	20 66 06	jsr $160666	                JSR DISPLAY_HEX
+.16052d	60		rts		                RTS
+.16052e					DRAW_LINES
+.16052e	a0 b8 a6	ldy #$a6b8	                LDY #$A000 + 128*13 + 56
+.160531	84 17		sty $17		                STY CURSORPOS
+.160533	a9 20		lda #$20	                LDA #$20
+.160535	85 1e		sta $1e		                STA CURCOLOR
+.160537	a0 1a 08	ldy #$081a	                LDY #<>LINES_MSG
+.16053a	84 60		sty $60		                STY MSG_ADDR
+.16053c	20 cc 05	jsr $1605cc	                JSR DISPLAY_MSG
+.16053f	e6 17		inc $17		                INC CURSORPOS
+.160541	a5 69		lda $69		                LDA TOTAL_LINES+1
+.160543	20 66 06	jsr $160666	                JSR DISPLAY_HEX
+.160546	a5 68		lda $68		                LDA TOTAL_LINES
+.160548	20 66 06	jsr $160666	                JSR DISPLAY_HEX
+.16054b	60		rts		                RTS
+.16054c					REMOVE_LINES_LOOP
+.16054c	af 94 00 16	lda $160094	                LDA TICK_COUNT
+.160550	1a		inc a		                INC A
+.160551	8f 94 00 16	sta $160094	                STA TICK_COUNT
+.160555	c9 01		cmp #$01	                CMP #1
+.160557	d0 23		bne $16057c	                BNE WAIT_FOR_50
+.160559	a0 b8 a5	ldy #$a5b8	                LDY #$A000 + 128*11 + 56
+.16055c	84 17		sty $17		                STY CURSORPOS
+.16055e	a9 20		lda #$20	                LDA #$20
+.160560	85 1e		sta $1e		                STA CURCOLOR
+.160562	a0 11 08	ldy #$0811	                LDY #<>BONUS_MSG
+.160565	84 60		sty $60		                STY MSG_ADDR
+.160567	20 cc 05	jsr $1605cc	                JSR DISPLAY_MSG
+.16056a	e6 17		inc $17		                INC CURSORPOS
+.16056c	a6 64		ldx $64		                LDX LINE_CNTR
+.16056e	bf f4 07 16	lda $1607f4,x	                LDA BONUS,X
+.160572	20 66 06	jsr $160666	                JSR DISPLAY_HEX
+.160575	a9 00		lda #$00	                LDA #0
+.160577	20 66 06	jsr $160666	                JSR DISPLAY_HEX
+.16057a	80 4f		bra $1605cb	                BRA SKIP_DELETE_LINES
+.16057c					    WAIT_FOR_50
+.16057c	c9 32		cmp #$32	                CMP #50
+.16057e	d0 4b		bne $1605cb	                BNE SKIP_DELETE_LINES
+.160580	a0 b8 a5	ldy #$a5b8	                LDY #$A000 + 128*11 + 56
+.160583	84 17		sty $17		                STY CURSORPOS
+.160585	a9 00		lda #$00	                LDA #0
+.160587	a0 00 00	ldy #$0000	                LDY #0
+.16058a					        CLEAR_BONUS_LP
+.16058a	97 17		sta [$17],y	                STA [CURSORPOS],Y
+.16058c	c8		iny		                INY
+.16058d	c0 10 00	cpy #$0010	                CPY #16
+.160590	d0 f8		bne $16058a	                BNE CLEAR_BONUS_LP
+.160592	a6 64		ldx $64		                LDX LINE_CNTR
+.160594	bf f4 07 16	lda $1607f4,x	                LDA BONUS,X
+.160598	eb		xba		                XBA ; multiply by 256
+.160599	a9 00		lda #$00	                LDA #0
+.16059b	c2 20		rep #$20	                REP #$20        ; set A long
+.16059d	f8		sed		                SED
+.16059e	18		clc		                CLC
+.16059f	6f a2 00 16	adc $1600a2	                ADC SCORE
+.1605a3	8f a2 00 16	sta $1600a2	                STA SCORE
+.1605a7	a5 64		lda $64		                LDA LINE_CNTR
+.1605a9	18		clc		                CLC
+.1605aa	65 68		adc $68		                ADC TOTAL_LINES
+.1605ac	85 68		sta $68		                STA TOTAL_LINES
+.1605ae	e2 20		sep #$20	                SEP #$20        ; set A short
+.1605b0	90 0b		bcc $1605bd	                BCC BONUS_CONTINUE
+.1605b2	af a4 00 16	lda $1600a4	                LDA SCORE+2
+.1605b6	18		clc		                CLC
+.1605b7	69 01		adc #$01	                ADC #1
+.1605b9	8f a4 00 16	sta $1600a4	                STA SCORE+2
+.1605bd					        BONUS_CONTINUE
+.1605bd	d8		cld		                CLD
+.1605be	20 8c 06	jsr $16068c	                JSR DELETE_LINES
+.1605c1	a9 00		lda #$00	                LDA #0
+.1605c3	8f 94 00 16	sta $160094	                STA TICK_COUNT
+.1605c7	8f a6 00 16	sta $1600a6	                STA GAME_STATE
+.1605cb					    SKIP_DELETE_LINES
+.1605cb	60		rts		                RTS
+.1605cc					DISPLAY_MSG
+.1605cc	8b		phb		                PHB
+.1605cd	a9 16		lda #$16	                LDA #`SCORE_MSG
+.1605cf	48		pha		                PHA
+.1605d0	ab		plb		                PLB
+.1605d1					    MSG_LOOP
+.1605d1	b2 60		lda ($60)	                LDA (MSG_ADDR)
+.1605d3	f0 0f		beq $1605e4	                BEQ MSG_DONE
+.1605d5	20 b2 01	jsr $1601b2	                JSR DISPLAY_SYMBOL
+.1605d8	a6 17		ldx $17		                LDX CURSORPOS
+.1605da	e8		inx		                INX
+.1605db	86 17		stx $17		                STX CURSORPOS
+.1605dd	a6 60		ldx $60		                LDX MSG_ADDR
+.1605df	e8		inx		                INX
+.1605e0	86 60		stx $60		                STX MSG_ADDR
+.1605e2	80 ed		bra $1605d1	                BRA MSG_LOOP
+.1605e4	ab		plb		    MSG_DONE    PLB
+.1605e5	60		rts		                RTS
+.1605e6					GAME_OVER
+.1605e6	a9 ff		lda #$ff	                LDA #$FF
+.1605e8	8f 4c 01 00	sta $00014c	                STA @lINT_MASK_REG0
+.1605ec	a9 01		lda #$01	                LDA #1
+.1605ee	8f a6 00 16	sta $1600a6	                STA GAME_STATE
+.1605f2	a9 0f		lda #$0f	                LDA #Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
+.1605f4	8f 00 00 af	sta $af0000	                STA MASTER_CTRL_REG_L
+.1605f8	22 a8 10 00	jsl $0010a8	                JSL CLRSCREEN
+.1605fc	a0 1f ad	ldy #$ad1f	                LDY #$A000 + 128*26 + 31
+.1605ff	84 17		sty $17		                STY CURSORPOS
+.160601	a9 23		lda #$23	                LDA #$23
+.160603	85 1e		sta $1e		                STA CURCOLOR
+.160605	a0 f9 07	ldy #$07f9	                LDY #<>GAME_OVER_MSG
+.160608	84 60		sty $60		                STY MSG_ADDR
+.16060a	20 cc 05	jsr $1605cc	                JSR DISPLAY_MSG
+.16060d	a0 9d ad	ldy #$ad9d	                LDY #$A000 + 128*27 + 29
+.160610	84 17		sty $17		                STY CURSORPOS
+.160612	a9 20		lda #$20	                LDA #$20
+.160614	85 1e		sta $1e		                STA CURCOLOR
+.160616	a0 03 08	ldy #$0803	                LDY #<>SCORE_MSG
+.160619	84 60		sty $60		                STY MSG_ADDR
+.16061b	20 cc 05	jsr $1605cc	                JSR DISPLAY_MSG
+.16061e	e6 17		inc $17		                INC CURSORPOS
+.160620	af a4 00 16	lda $1600a4	                LDA SCORE + 2
+.160624	20 66 06	jsr $160666	                JSR DISPLAY_HEX
+.160627	af a3 00 16	lda $1600a3	                LDA SCORE + 1
+.16062b	20 66 06	jsr $160666	                JSR DISPLAY_HEX
+.16062e	af a2 00 16	lda $1600a2	                LDA SCORE
+.160632	20 66 06	jsr $160666	                JSR DISPLAY_HEX
+.160635	a9 00		lda #$00	                LDA #0
+.160637	8f 9c 00 16	sta $16009c	                STA PIECE_Y
+.16063b	a2 02 00	ldx #$0002	                LDX #2
+.16063e					        CLEAR_BOARD_ROW
+.16063e	a0 00 00	ldy #$0000	                LDY #0
+.160641	a9 00		lda #$00	                LDA #0
+.160643					        CLEAR_BOARD_COL
+.160643	9f 95 08 16	sta $160895,x	                STA BOARD,X
+.160647	e8		inx		                INX
+.160648	c8		iny		                INY
+.160649	c0 0a 00	cpy #$000a	                CPY #10
+.16064c	d0 f5		bne $160643	                BNE CLEAR_BOARD_COL
+.16064e	e8		inx		                INX
+.16064f	e8		inx		                INX
+.160650	e8		inx		                INX
+.160651	e8		inx		                INX
+.160652	af 9c 00 16	lda $16009c	                LDA PIECE_Y
+.160656	1a		inc a		                INC A
+.160657	8f 9c 00 16	sta $16009c	                STA PIECE_Y
+.16065b	c9 14		cmp #$14	                CMP #BOARD_HEIGHT-1
+.16065d	d0 df		bne $16063e	                BNE CLEAR_BOARD_ROW
+.16065f	a9 00		lda #$00	                LDA #0
+.160661	8f 9c 00 16	sta $16009c	                STA PIECE_Y
+.160665	60		rts		                RTS
+.160666					DISPLAY_HEX
+.160666	48		pha		                PHA
+.160667	eb		xba		                XBA
+.160668	a9 00		lda #$00	                LDA #0
+.16066a	eb		xba		                XBA
+.16066b	29 f0		and #$f0	                AND #$F0
+.16066d	4a		lsr a		                LSR A
+.16066e	4a		lsr a		                LSR A
+.16066f	4a		lsr a		                LSR A
+.160670	4a		lsr a		                LSR A
+.160671	aa		tax		                TAX
+.160672	bf e4 07 16	lda $1607e4,x	                LDA HEX_VALUES,X
+.160676	20 b2 01	jsr $1601b2	                JSR DISPLAY_SYMBOL
+.160679	e6 17		inc $17		                INC CURSORPOS
+.16067b	a9 00		lda #$00	                LDA #0  ; clear B
+.16067d	eb		xba		                XBA
+.16067e	68		pla		                PLA
+.16067f	29 0f		and #$0f	                AND #$F
+.160681	aa		tax		                TAX
+.160682	bf e4 07 16	lda $1607e4,x	                LDA HEX_VALUES,X
+.160686	20 b2 01	jsr $1601b2	                JSR DISPLAY_SYMBOL
+.160689	e6 17		inc $17		                INC CURSORPOS
+.16068b	60		rts		                RTS
+.16068c					DELETE_LINES
+.16068c	8b		phb		                PHB
+.16068d	c2 20		rep #$20	                REP #$20        ; set A long
+.16068f	a5 64		lda $64		                LDA LINE_CNTR
+.160691	29 0f 00	and #$000f	                AND #$F
+.160694	f0 40		beq $1606d6	                BEQ DELETE_LINES_DONE
+.160696	a9 0a 01	lda #$010a	                LDA #BOARD_WIDTH * (BOARD_HEIGHT-2)
+.160699					        LOOK_UP
+.160699	8f 23 08 16	sta $160823	                STA BYTE_CNTR
+.16069d	aa		tax		                TAX
+.16069e					        CHECK_NEXT
+.16069e	e8		inx		                INX
+.16069f	e8		inx		                INX
+.1606a0	bf 95 08 16	lda $160895,x	                LDA @lBOARD,X
+.1606a4	c9 09 0a	cmp #$0a09	                CMP #$A09
+.1606a7	d0 23		bne $1606cc	                BNE DONT_DELETE
+.1606a9	a9 95 08	lda #$0895	                LDA #<>BOARD
+.1606ac	18		clc		                CLC
+.1606ad	6f 23 08 16	adc $160823	                ADC BYTE_CNTR
+.1606b1	aa		tax		                TAX
+.1606b2	69 0e 00	adc #$000e	                ADC #BOARD_WIDTH
+.1606b5	a8		tay		                TAY
+.1606b6	af 23 08 16	lda $160823	                LDA BYTE_CNTR
+.1606ba	3a		dec a		                DEC A
+.1606bb	44 16 16	mvp $16,$16	                MVP `BOARD,`BOARD
+.1606be	af 23 08 16	lda $160823	                LDA BYTE_CNTR
+.1606c2	aa		tax		                TAX
+.1606c3	a5 64		lda $64		                LDA LINE_CNTR
+.1606c5	3a		dec a		                DEC A
+.1606c6	85 64		sta $64		                STA LINE_CNTR
+.1606c8	d0 d4		bne $16069e	                BNE CHECK_NEXT
+.1606ca	80 0a		bra $1606d6	                BRA DELETE_LINES_DONE
+.1606cc					        DONT_DELETE
+.1606cc	af 23 08 16	lda $160823	                LDA BYTE_CNTR
+.1606d0	38		sec		                SEC
+.1606d1	e9 0e 00	sbc #$000e	                SBC #BOARD_WIDTH
+.1606d4	80 c3		bra $160699	                BRA LOOK_UP
+.1606d6					    DELETE_LINES_DONE
+.1606d6	e2 20		sep #$20	                SEP #$20        ; set A short
+.1606d8	ab		plb		                PLB
+.1606d9	60		rts		                RTS
+.1606da					LOAD_GAME_ASSETS
+.1606da	8b		phb		                PHB
+.1606db	a9 80		lda #$80	                LDA #Mstr_Ctrl_Disable_Vid
+.1606dd	8f 00 00 af	sta $af0000	                STA MASTER_CTRL_REG_L
+.1606e1	c2 20		rep #$20	                REP #$20        ; set A long
+.1606e3	a9 00 04	lda #$0400	                LDA #$400
+.1606e6	a2 b7 1d	ldx #$1db7	                LDX #<>PALETTE
+.1606e9	a0 00 24	ldy #$2400	                LDY #<>GRPH_LUT1_PTR
+.1606ec	54 af 16	mvn $16,$af	                MVN #`PALETTE,#`GRPH_LUT1_PTR
+.1606ef	a9 00 04	lda #$0400	                LDA #$400
+.1606f2	a2 bb 19	ldx #$19bb	                LDX #<>BACKGROUND_PAL
+.1606f5	a0 00 20	ldy #$2000	                LDY #<>GRPH_LUT0_PTR
+.1606f8	54 af 16	mvn $16,$af	                MVN #`PALETTE,#`GRPH_LUT0_PTR
+.1606fb	a9 ff ff	lda #$ffff	                LDA #$FFFF
+.1606fe	a2 00 00	ldx #$0000	                LDX #<>BACKGROUND
+.160701	a0 00 00	ldy #$0000	                LDY #$0
+.160704	54 b1 17	mvn $17,$b1	                MVN `BACKGROUND,$B1
+.160707	a9 ff ff	lda #$ffff	                LDA #$FFFF
+.16070a	a2 00 00	ldx #$0000	                LDX #<>BACKGROUND
+.16070d	a0 00 00	ldy #$0000	                LDY #0
+.160710	54 b2 18	mvn $18,$b2	                MVN `BACKGROUND+$10000,$B2
+.160713	a9 ff ff	lda #$ffff	                LDA #$FFFF
+.160716	a2 00 00	ldx #$0000	                LDX #<>BACKGROUND
+.160719	a0 00 00	ldy #$0000	                LDY #0
+.16071c	54 b3 19	mvn $19,$b3	                MVN `BACKGROUND+$20000,$B3
+.16071f	a9 ff ff	lda #$ffff	                LDA #$FFFF
+.160722	a2 00 00	ldx #$0000	                LDX #<>BACKGROUND
+.160725	a0 00 00	ldy #$0000	                LDY #0
+.160728	54 b4 1a	mvn $1a,$b4	                MVN `BACKGROUND+$30000,$B4
+.16072b	a9 ff af	lda #$afff	                LDA #$AFFF
+.16072e	a2 00 00	ldx #$0000	                LDX #<>BACKGROUND
+.160731	a0 00 00	ldy #$0000	                LDY #0
+.160734	54 b5 1b	mvn $1b,$b5	                MVN `BACKGROUND+$40000,$B5
+.160737	a9 00 10	lda #$1000	                LDA #$1000
+.16073a	a2 bb 09	ldx #$09bb	                LDX #<>TILES
+.16073d	a0 00 00	ldy #$0000	                LDY #0
+.160740	54 b0 16	mvn $16,$b0	                MVN `TILES,$B0
+.160743	a9 80 02	lda #$0280	                LDA #640
+.160746	8f 44 01 af	sta $af0144	                STA BM_X_SIZE_L
+.16074a	a9 e0 01	lda #$01e0	                LDA #480
+.16074d	8f 46 01 af	sta $af0146	                STA BM_Y_SIZE_L
+.160751	e2 20		sep #$20	                SEP #$20        ; set A short
+.160753	ab		plb		                PLB ; MVN operations set the bank - so we need to reset
+.160754	20 e3 07	jsr $1607e3	                JSR LOAD_SONG
+.160757	a9 83		lda #$83	                LDA #$83 ; we're using a 256 stride
+.160759	8f 00 01 af	sta $af0100	                STA TL0_CONTROL_REG
+.16075d	a9 01		lda #$01	                LDA #$1  ; enable bitmap with LUT 2
+.16075f	8f 40 01 af	sta $af0140	                STA BM_CONTROL_REG
+.160763	8f 43 01 af	sta $af0143	                STA BM_START_ADDY_H ; start at $b1:0000
+.160767	60		rts		                RTS
+.160768					INIT_GAME
+.160768	a9 28		lda #$28	                LDA #INITIAL_GAME_SPEED
+.16076a	8f a0 00 16	sta $1600a0	                STA GAME_SPEED
+.16076e	a9 00		lda #$00	                LDA #0       ;Set Cursor Disabled
+.160770	8f 10 00 af	sta $af0010	                STA VKY_TXT_CURSOR_CTRL_REG
+.160774	8f 9c 00 16	sta $16009c	                STA PIECE_Y
+.160778	8f 9f 00 16	sta $16009f	                STA PIECE_FIT
+.16077c	8f 94 00 16	sta $160094	                STA TICK_COUNT
+.160780	8f a6 00 16	sta $1600a6	                STA GAME_STATE
+.160784	8f a2 00 16	sta $1600a2	                STA SCORE
+.160788	8f a3 00 16	sta $1600a3	                STA SCORE + 1
+.16078c	8f a4 00 16	sta $1600a4	                STA SCORE + 2
+.160790	85 68		sta $68		                STA TOTAL_LINES
+.160792	85 69		sta $69		                STA TOTAL_LINES + 1
+.160794	8f 05 00 af	sta $af0005	                STA BORDER_COLOR_B
+.160798	8f 06 00 af	sta $af0006	                STA BORDER_COLOR_G
+.16079c	8f 07 00 af	sta $af0007	                STA BORDER_COLOR_R
+.1607a0	a9 01		lda #$01	                LDA #1
+.1607a2	8f a7 00 16	sta $1600a7	                STA LEVEL
+.1607a6	a9 ff		lda #$ff	                LDA #$FF
+.1607a8	8f 48 01 00	sta $000148	                STA @lINT_EDGE_REG0
+.1607ac	8f 49 01 00	sta $000149	                STA @lINT_EDGE_REG1
+.1607b0	8f 4a 01 00	sta $00014a	                STA @lINT_EDGE_REG2
+.1607b4	8f 4b 01 00	sta $00014b	                STA @lINT_EDGE_REG3
+.1607b8	a9 ff		lda #$ff	                LDA #$FF
+.1607ba	8f 4c 01 00	sta $00014c	                STA @lINT_MASK_REG0
+.1607be	8f 4d 01 00	sta $00014d	                STA @lINT_MASK_REG1
+.1607c2	8f 4e 01 00	sta $00014e	                STA @lINT_MASK_REG2
+.1607c6	8f 4f 01 00	sta $00014f	                STA @lINT_MASK_REG3
+.1607ca	a2 00 50	ldx #$5000	                LDX #$5000
+.1607cd	86 17		stx $17		                STX CURSORPOS
+.1607cf	a9 00		lda #$00	                LDA #0
+.1607d1	a0 00 00	ldy #$0000	                LDY #0
+.1607d4					        CLEAR_TS_LOOP
+.1607d4	97 17		sta [$17],y	                STA [CURSORPOS],Y
+.1607d6	c8		iny		                INY
+.1607d7	c0 00 08	cpy #$0800	                CPY #$800
+.1607da	d0 f8		bne $1607d4	                BNE CLEAR_TS_LOOP
+.1607dc	a9 1f		lda #$1f	                LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
+.1607de	8f 00 00 af	sta $af0000	                STA MASTER_CTRL_REG_L
+.1607e2	60		rts		                RTS
+.1607e3					LOAD_SONG
+.1607e3	60		rts		                RTS
+>1607e4	30 31 32 33 34 35 36 37		HEX_VALUES      .text '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'
+>1607ec	38 39 41 42 43 44 45 46
+>1607f4	00 01 03 06 10			BONUS           .text 0,1,3,6,$10
+>1607f9	47 41 4d 45 20 4f 56 45		GAME_OVER_MSG   .text 'GAME OVER',0
+>160801	52 00
+>160803	53 43 4f 52 45 3a 00		SCORE_MSG       .text 'SCORE:',0
+>16080a	4c 45 56 45 4c 3a 00		LEVEL_MSG       .text 'LEVEL:',0
+>160811	42 4f 4e 55 53 3a 20 20		BONUS_MSG       .text 'BONUS:  ',0
+>160819	00
+>16081a	4c 49 4e 45 53 3a 20 20		LINES_MSG       .text 'LINES:  ',0
+>160822	00
+>160823	00 00				BYTE_CNTR       .word 0
+.160825					PIECE0
+>160825	00 00 01 00			    .byte 0,0,1,0
+>160829	00 00 01 00			    .byte 0,0,1,0
+>16082d	00 00 01 00			    .byte 0,0,1,0
+>160831	00 00 01 00			    .byte 0,0,1,0
+.160835					PIECE1
+>160835	00 01 01 00			    .byte 0,1,1,0
+>160839	00 01 01 00			    .byte 0,1,1,0
+>16083d	00 00 00 00			    .byte 0,0,0,0
+>160841	00 00 00 00			    .byte 0,0,0,0
+.160845					PIECE2
+>160845	00 01 00 00			    .byte 0,1,0,0
+>160849	00 01 00 00			    .byte 0,1,0,0
+>16084d	00 01 01 00			    .byte 0,1,1,0
+>160851	00 00 00 00			    .byte 0,0,0,0
+.160855					PIECE3
+>160855	00 00 01 00			    .byte 0,0,1,0
+>160859	00 00 01 00			    .byte 0,0,1,0
+>16085d	00 01 01 00			    .byte 0,1,1,0
+>160861	00 00 00 00			    .byte 0,0,0,0
+.160865					PIECE4
+>160865	00 00 01 00			    .byte 0,0,1,0
+>160869	00 01 01 00			    .byte 0,1,1,0
+>16086d	00 00 01 00			    .byte 0,0,1,0
+>160871	00 00 00 00			    .byte 0,0,0,0
+.160875					PIECE5
+>160875	00 00 01 00			    .byte 0,0,1,0
+>160879	00 01 01 00			    .byte 0,1,1,0
+>16087d	00 01 00 00			    .byte 0,1,0,0
+>160881	00 00 00 00			    .byte 0,0,0,0
+.160885					PIECE6
+>160885	00 01 00 00			    .byte 0,1,0,0
+>160889	00 01 01 00			    .byte 0,1,1,0
+>16088d	00 00 01 00			    .byte 0,0,1,0
+>160891	00 00 00 00			    .byte 0,0,0,0
+.160895					BOARD
+>160895	23				    .byte '#'
+>160896	23				    .byte '#'
 >160897	00				        .byte 0
->160898	23				    .byte '#'
->160899	23				    .byte '#'
->16089a	23				    .byte '#'
->16089b	23				    .byte '#'
+>160898	00				        .byte 0
+>160899	00				        .byte 0
+>16089a	00				        .byte 0
+>16089b	00				        .byte 0
 >16089c	00				        .byte 0
 >16089d	00				        .byte 0
 >16089e	00				        .byte 0
 >16089f	00				        .byte 0
 >1608a0	00				        .byte 0
->1608a1	00				        .byte 0
->1608a2	00				        .byte 0
->1608a3	00				        .byte 0
->1608a4	00				        .byte 0
+>1608a1	23				    .byte '#'
+>1608a2	23				    .byte '#'
+>1608a3	23				    .byte '#'
+>1608a4	23				    .byte '#'
 >1608a5	00				        .byte 0
->1608a6	23				    .byte '#'
->1608a7	23				    .byte '#'
->1608a8	23				    .byte '#'
->1608a9	23				    .byte '#'
+>1608a6	00				        .byte 0
+>1608a7	00				        .byte 0
+>1608a8	00				        .byte 0
+>1608a9	00				        .byte 0
 >1608aa	00				        .byte 0
 >1608ab	00				        .byte 0
 >1608ac	00				        .byte 0
 >1608ad	00				        .byte 0
 >1608ae	00				        .byte 0
->1608af	00				        .byte 0
->1608b0	00				        .byte 0
->1608b1	00				        .byte 0
->1608b2	00				        .byte 0
+>1608af	23				    .byte '#'
+>1608b0	23				    .byte '#'
+>1608b1	23				    .byte '#'
+>1608b2	23				    .byte '#'
 >1608b3	00				        .byte 0
->1608b4	23				    .byte '#'
->1608b5	23				    .byte '#'
->1608b6	23				    .byte '#'
->1608b7	23				    .byte '#'
+>1608b4	00				        .byte 0
+>1608b5	00				        .byte 0
+>1608b6	00				        .byte 0
+>1608b7	00				        .byte 0
 >1608b8	00				        .byte 0
 >1608b9	00				        .byte 0
 >1608ba	00				        .byte 0
 >1608bb	00				        .byte 0
 >1608bc	00				        .byte 0
->1608bd	00				        .byte 0
->1608be	00				        .byte 0
->1608bf	00				        .byte 0
->1608c0	00				        .byte 0
+>1608bd	23				    .byte '#'
+>1608be	23				    .byte '#'
+>1608bf	23				    .byte '#'
+>1608c0	23				    .byte '#'
 >1608c1	00				        .byte 0
->1608c2	23				    .byte '#'
->1608c3	23				    .byte '#'
->1608c4	23				    .byte '#'
->1608c5	23				    .byte '#'
+>1608c2	00				        .byte 0
+>1608c3	00				        .byte 0
+>1608c4	00				        .byte 0
+>1608c5	00				        .byte 0
 >1608c6	00				        .byte 0
 >1608c7	00				        .byte 0
 >1608c8	00				        .byte 0
 >1608c9	00				        .byte 0
 >1608ca	00				        .byte 0
->1608cb	00				        .byte 0
->1608cc	00				        .byte 0
->1608cd	00				        .byte 0
->1608ce	00				        .byte 0
+>1608cb	23				    .byte '#'
+>1608cc	23				    .byte '#'
+>1608cd	23				    .byte '#'
+>1608ce	23				    .byte '#'
 >1608cf	00				        .byte 0
->1608d0	23				    .byte '#'
->1608d1	23				    .byte '#'
->1608d2	23				    .byte '#'
->1608d3	23				    .byte '#'
+>1608d0	00				        .byte 0
+>1608d1	00				        .byte 0
+>1608d2	00				        .byte 0
+>1608d3	00				        .byte 0
 >1608d4	00				        .byte 0
 >1608d5	00				        .byte 0
 >1608d6	00				        .byte 0
 >1608d7	00				        .byte 0
 >1608d8	00				        .byte 0
->1608d9	00				        .byte 0
->1608da	00				        .byte 0
->1608db	00				        .byte 0
->1608dc	00				        .byte 0
+>1608d9	23				    .byte '#'
+>1608da	23				    .byte '#'
+>1608db	23				    .byte '#'
+>1608dc	23				    .byte '#'
 >1608dd	00				        .byte 0
->1608de	23				    .byte '#'
->1608df	23				    .byte '#'
->1608e0	23				    .byte '#'
->1608e1	23				    .byte '#'
+>1608de	00				        .byte 0
+>1608df	00				        .byte 0
+>1608e0	00				        .byte 0
+>1608e1	00				        .byte 0
 >1608e2	00				        .byte 0
 >1608e3	00				        .byte 0
 >1608e4	00				        .byte 0
 >1608e5	00				        .byte 0
 >1608e6	00				        .byte 0
->1608e7	00				        .byte 0
->1608e8	00				        .byte 0
->1608e9	00				        .byte 0
->1608ea	00				        .byte 0
+>1608e7	23				    .byte '#'
+>1608e8	23				    .byte '#'
+>1608e9	23				    .byte '#'
+>1608ea	23				    .byte '#'
 >1608eb	00				        .byte 0
->1608ec	23				    .byte '#'
->1608ed	23				    .byte '#'
->1608ee	23				    .byte '#'
->1608ef	23				    .byte '#'
->1608f0	23				    .byte '#'
->1608f1	23				    .byte '#'
->1608f2	23				    .byte '#'
->1608f3	23				    .byte '#'
->1608f4	23				    .byte '#'
+>1608ec	00				        .byte 0
+>1608ed	00				        .byte 0
+>1608ee	00				        .byte 0
+>1608ef	00				        .byte 0
+>1608f0	00				        .byte 0
+>1608f1	00				        .byte 0
+>1608f2	00				        .byte 0
+>1608f3	00				        .byte 0
+>1608f4	00				        .byte 0
 >1608f5	23				    .byte '#'
 >1608f6	23				    .byte '#'
 >1608f7	23				    .byte '#'
 >1608f8	23				    .byte '#'
->1608f9	23				    .byte '#'
->1608fa	23				    .byte '#'
->1608fb	23				    .byte '#'
-.1608fc					PIECE0
->1608fc	00 00 01 00			    .byte 0,0,1,0
->160900	00 00 01 00			    .byte 0,0,1,0
->160904	00 00 01 00			    .byte 0,0,1,0
->160908	00 00 01 00			    .byte 0,0,1,0
-.16090c					PIECE1
->16090c	00 01 01 00			    .byte 0,1,1,0
->160910	00 01 01 00			    .byte 0,1,1,0
->160914	00 00 00 00			    .byte 0,0,0,0
->160918	00 00 00 00			    .byte 0,0,0,0
-.16091c					PIECE2
->16091c	00 01 00 00			    .byte 0,1,0,0
->160920	00 01 00 00			    .byte 0,1,0,0
->160924	00 01 01 00			    .byte 0,1,1,0
->160928	00 00 00 00			    .byte 0,0,0,0
-.16092c					PIECE3
->16092c	00 00 01 00			    .byte 0,0,1,0
->160930	00 00 01 00			    .byte 0,0,1,0
->160934	00 01 01 00			    .byte 0,1,1,0
->160938	00 00 00 00			    .byte 0,0,0,0
-.16093c					PIECE4
->16093c	00 00 01 00			    .byte 0,0,1,0
->160940	00 01 01 00			    .byte 0,1,1,0
->160944	00 00 01 00			    .byte 0,0,1,0
->160948	00 00 00 00			    .byte 0,0,0,0
-.16094c					PIECE5
->16094c	00 00 01 00			    .byte 0,0,1,0
->160950	00 01 01 00			    .byte 0,1,1,0
->160954	00 01 00 00			    .byte 0,1,0,0
->160958	00 00 00 00			    .byte 0,0,0,0
-.16095c					PIECE6
->16095c	00 01 00 00			    .byte 0,1,0,0
->160960	00 01 01 00			    .byte 0,1,1,0
->160964	00 00 01 00			    .byte 0,0,1,0
->160968	00 00 00 00			    .byte 0,0,0,0
-.16096c					TILES
->16096c	00 00 00 00 00 00 00 00		.binary "tetris-tiles.data"
->160974	00 00 00 00 00 00 00 00 03 03 03 03 03 03 03 03
->160984	03 03 03 03 03 03 03 03 00 52 52 52 52 52 52 52
->160994	52 52 52 52 52 52 52 00 00 e6 e6 e6 e6 e6 e6 e6
->1609a4	e6 e6 e6 e6 e6 e6 e6 00 00 06 06 06 06 06 06 06
->1609b4	06 06 06 06 06 06 06 00 00 8a 8a 8a 8a 8a 8a 8a
->1609c4	8a 8a 8a 8a 8a 8a 8a 00 00 01 01 01 01 01 01 01
->1609d4	01 01 01 01 01 01 01 00 00 be be be be be be be
->1609e4	be be be be be be be 00 00 66 66 66 66 66 66 66
->1609f4	66 66 66 66 66 66 66 00 00 00 00 00 00 00 00 00
->160a04	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>1608f9	00				        .byte 0
+>1608fa	00				        .byte 0
+>1608fb	00				        .byte 0
+>1608fc	00				        .byte 0
+>1608fd	00				        .byte 0
+>1608fe	00				        .byte 0
+>1608ff	00				        .byte 0
+>160900	00				        .byte 0
+>160901	00				        .byte 0
+>160902	00				        .byte 0
+>160903	23				    .byte '#'
+>160904	23				    .byte '#'
+>160905	23				    .byte '#'
+>160906	23				    .byte '#'
+>160907	00				        .byte 0
+>160908	00				        .byte 0
+>160909	00				        .byte 0
+>16090a	00				        .byte 0
+>16090b	00				        .byte 0
+>16090c	00				        .byte 0
+>16090d	00				        .byte 0
+>16090e	00				        .byte 0
+>16090f	00				        .byte 0
+>160910	00				        .byte 0
+>160911	23				    .byte '#'
+>160912	23				    .byte '#'
+>160913	23				    .byte '#'
+>160914	23				    .byte '#'
+>160915	00				        .byte 0
+>160916	00				        .byte 0
+>160917	00				        .byte 0
+>160918	00				        .byte 0
+>160919	00				        .byte 0
+>16091a	00				        .byte 0
+>16091b	00				        .byte 0
+>16091c	00				        .byte 0
+>16091d	00				        .byte 0
+>16091e	00				        .byte 0
+>16091f	23				    .byte '#'
+>160920	23				    .byte '#'
+>160921	23				    .byte '#'
+>160922	23				    .byte '#'
+>160923	00				        .byte 0
+>160924	00				        .byte 0
+>160925	00				        .byte 0
+>160926	00				        .byte 0
+>160927	00				        .byte 0
+>160928	00				        .byte 0
+>160929	00				        .byte 0
+>16092a	00				        .byte 0
+>16092b	00				        .byte 0
+>16092c	00				        .byte 0
+>16092d	23				    .byte '#'
+>16092e	23				    .byte '#'
+>16092f	23				    .byte '#'
+>160930	23				    .byte '#'
+>160931	00				        .byte 0
+>160932	00				        .byte 0
+>160933	00				        .byte 0
+>160934	00				        .byte 0
+>160935	00				        .byte 0
+>160936	00				        .byte 0
+>160937	00				        .byte 0
+>160938	00				        .byte 0
+>160939	00				        .byte 0
+>16093a	00				        .byte 0
+>16093b	23				    .byte '#'
+>16093c	23				    .byte '#'
+>16093d	23				    .byte '#'
+>16093e	23				    .byte '#'
+>16093f	00				        .byte 0
+>160940	00				        .byte 0
+>160941	00				        .byte 0
+>160942	00				        .byte 0
+>160943	00				        .byte 0
+>160944	00				        .byte 0
+>160945	00				        .byte 0
+>160946	00				        .byte 0
+>160947	00				        .byte 0
+>160948	00				        .byte 0
+>160949	23				    .byte '#'
+>16094a	23				    .byte '#'
+>16094b	23				    .byte '#'
+>16094c	23				    .byte '#'
+>16094d	00				        .byte 0
+>16094e	00				        .byte 0
+>16094f	00				        .byte 0
+>160950	00				        .byte 0
+>160951	00				        .byte 0
+>160952	00				        .byte 0
+>160953	00				        .byte 0
+>160954	00				        .byte 0
+>160955	00				        .byte 0
+>160956	00				        .byte 0
+>160957	23				    .byte '#'
+>160958	23				    .byte '#'
+>160959	23				    .byte '#'
+>16095a	23				    .byte '#'
+>16095b	00				        .byte 0
+>16095c	00				        .byte 0
+>16095d	00				        .byte 0
+>16095e	00				        .byte 0
+>16095f	00				        .byte 0
+>160960	00				        .byte 0
+>160961	00				        .byte 0
+>160962	00				        .byte 0
+>160963	00				        .byte 0
+>160964	00				        .byte 0
+>160965	23				    .byte '#'
+>160966	23				    .byte '#'
+>160967	23				    .byte '#'
+>160968	23				    .byte '#'
+>160969	00				        .byte 0
+>16096a	00				        .byte 0
+>16096b	00				        .byte 0
+>16096c	00				        .byte 0
+>16096d	00				        .byte 0
+>16096e	00				        .byte 0
+>16096f	00				        .byte 0
+>160970	00				        .byte 0
+>160971	00				        .byte 0
+>160972	00				        .byte 0
+>160973	23				    .byte '#'
+>160974	23				    .byte '#'
+>160975	23				    .byte '#'
+>160976	23				    .byte '#'
+>160977	00				        .byte 0
+>160978	00				        .byte 0
+>160979	00				        .byte 0
+>16097a	00				        .byte 0
+>16097b	00				        .byte 0
+>16097c	00				        .byte 0
+>16097d	00				        .byte 0
+>16097e	00				        .byte 0
+>16097f	00				        .byte 0
+>160980	00				        .byte 0
+>160981	23				    .byte '#'
+>160982	23				    .byte '#'
+>160983	23				    .byte '#'
+>160984	23				    .byte '#'
+>160985	00				        .byte 0
+>160986	00				        .byte 0
+>160987	00				        .byte 0
+>160988	00				        .byte 0
+>160989	00				        .byte 0
+>16098a	00				        .byte 0
+>16098b	00				        .byte 0
+>16098c	00				        .byte 0
+>16098d	00				        .byte 0
+>16098e	00				        .byte 0
+>16098f	23				    .byte '#'
+>160990	23				    .byte '#'
+>160991	23				    .byte '#'
+>160992	23				    .byte '#'
+>160993	00				        .byte 0
+>160994	00				        .byte 0
+>160995	00				        .byte 0
+>160996	00				        .byte 0
+>160997	00				        .byte 0
+>160998	00				        .byte 0
+>160999	00				        .byte 0
+>16099a	00				        .byte 0
+>16099b	00				        .byte 0
+>16099c	00				        .byte 0
+>16099d	23				    .byte '#'
+>16099e	23				    .byte '#'
+>16099f	23				    .byte '#'
+>1609a0	23				    .byte '#'
+>1609a1	00				        .byte 0
+>1609a2	00				        .byte 0
+>1609a3	00				        .byte 0
+>1609a4	00				        .byte 0
+>1609a5	00				        .byte 0
+>1609a6	00				        .byte 0
+>1609a7	00				        .byte 0
+>1609a8	00				        .byte 0
+>1609a9	00				        .byte 0
+>1609aa	00				        .byte 0
+>1609ab	23				    .byte '#'
+>1609ac	23				    .byte '#'
+>1609ad	23				    .byte '#'
+>1609ae	23				    .byte '#'
+>1609af	23				    .byte '#'
+>1609b0	23				    .byte '#'
+>1609b1	23				    .byte '#'
+>1609b2	23				    .byte '#'
+>1609b3	23				    .byte '#'
+>1609b4	23				    .byte '#'
+>1609b5	23				    .byte '#'
+>1609b6	23				    .byte '#'
+>1609b7	23				    .byte '#'
+>1609b8	23				    .byte '#'
+>1609b9	23				    .byte '#'
+>1609ba	23				    .byte '#'
+.1609bb					TILES
+>1609bb	00 00 00 00 00 00 00 00		.binary "tetris-tiles.data"
+>1609c3	00 00 00 00 00 00 00 00 03 03 03 03 03 03 03 03
+>1609d3	03 03 03 03 03 03 03 03 00 52 52 52 52 52 52 52
+>1609e3	52 52 52 52 52 52 52 00 00 e6 e6 e6 e6 e6 e6 e6
+>1609f3	e6 e6 e6 e6 e6 e6 e6 00 00 06 06 06 06 06 06 06
+>160a03	06 06 06 06 06 06 06 00 00 8a 8a 8a 8a 8a 8a 8a
+>160a13	8a 8a 8a 8a 8a 8a 8a 00 00 01 01 01 01 01 01 01
+>160a23	01 01 01 01 01 01 01 00 00 be be be be be be be
+>160a33	be be be be be be be 00 00 66 66 66 66 66 66 66
+>160a43	66 66 66 66 66 66 66 00 00 00 00 00 00 00 00 00
+>160a53	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 6 times (96 bytes)...
->160a74	00 00 00 00 00 00 00 00 03 01 01 01 01 01 01 01
->160a84	01 01 01 01 01 01 00 03 52 41 41 41 41 41 41 41
->160a94	41 41 41 41 41 41 41 80 e6 f7 f7 f7 f7 f7 f7 f7
->160aa4	f7 f7 f7 f7 f7 f7 f7 df 06 07 07 07 07 07 07 07
->160ab4	07 07 07 07 07 07 07 08 8a 4e 4e 4e 4e 4e 4e 4e
->160ac4	4e 4e 4e 4e 4e 4e 4e 1f 01 02 02 02 02 02 02 02
->160ad4	02 02 02 02 02 02 02 04 be ce ce ce ce ce ce ce
->160ae4	ce ce ce ce ce ce ce cf 66 46 46 46 46 46 46 46
->160af4	46 46 46 46 46 46 46 26 00 00 00 09 09 09 09 09
->160b04	09 09 09 09 09 09 09 09 09 09 09 09 09 09 09 09
->160b14	09 09 09 09 09 09 09 09 09 09 09 09 09 09 09 09
->160b24	09 09 09 09 09 00 00 00 00 00 00 00 00 00 00 00
->160b34	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>160ac3	00 00 00 00 00 00 00 00 03 01 01 01 01 01 01 01
+>160ad3	01 01 01 01 01 01 00 03 52 41 41 41 41 41 41 41
+>160ae3	41 41 41 41 41 41 41 80 e6 f7 f7 f7 f7 f7 f7 f7
+>160af3	f7 f7 f7 f7 f7 f7 f7 df 06 07 07 07 07 07 07 07
+>160b03	07 07 07 07 07 07 07 08 8a 4e 4e 4e 4e 4e 4e 4e
+>160b13	4e 4e 4e 4e 4e 4e 4e 1f 01 02 02 02 02 02 02 02
+>160b23	02 02 02 02 02 02 02 04 be ce ce ce ce ce ce ce
+>160b33	ce ce ce ce ce ce ce cf 66 46 46 46 46 46 46 46
+>160b43	46 46 46 46 46 46 46 26 00 00 00 09 09 09 09 09
+>160b53	09 09 09 09 09 09 09 09 09 09 09 09 09 09 09 09
+>160b63	09 09 09 09 09 09 09 09 09 09 09 09 09 09 09 09
+>160b73	09 09 09 09 09 00 00 00 00 00 00 00 00 00 00 00
+>160b83	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 3 times (48 bytes)...
->160b74	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
->160b84	e9 e9 e9 e9 e9 e9 04 03 52 41 42 80 42 80 42 80
->160b94	42 80 42 80 42 80 41 80 e6 f7 e9 f9 e9 f9 e9 f9
->160ba4	e9 f9 e9 f9 e9 f9 f7 df 06 07 17 68 17 68 17 68
->160bb4	17 68 17 68 17 68 07 08 8a 4e 6e 2d 6e 2d 6e 2d
->160bc4	6e 2d 6e 2d 6e 2d 4e 1f 01 02 01 03 01 03 01 03
->160bd4	01 03 01 03 01 03 02 04 be ce df bf df bf df bf
->160be4	df bf df bf df bf ce cf 66 46 17 66 17 66 17 66
->160bf4	17 66 17 66 17 66 46 26 00 00 09 4b 6d 6d 4b 4b
->160c04	6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b
->160c14	6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b
->160c24	6d 6d 4b 4b 6d 09 00 00 00 00 00 00 00 00 00 00
->160c34	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>160bc3	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
+>160bd3	e9 e9 e9 e9 e9 e9 04 03 52 41 42 80 42 80 42 80
+>160be3	42 80 42 80 42 80 41 80 e6 f7 e9 f9 e9 f9 e9 f9
+>160bf3	e9 f9 e9 f9 e9 f9 f7 df 06 07 17 68 17 68 17 68
+>160c03	17 68 17 68 17 68 07 08 8a 4e 6e 2d 6e 2d 6e 2d
+>160c13	6e 2d 6e 2d 6e 2d 4e 1f 01 02 01 03 01 03 01 03
+>160c23	01 03 01 03 01 03 02 04 be ce df bf df bf df bf
+>160c33	df bf df bf df bf ce cf 66 46 17 66 17 66 17 66
+>160c43	17 66 17 66 17 66 46 26 00 00 09 4b 6d 6d 4b 4b
+>160c53	6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b
+>160c63	6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b
+>160c73	6d 6d 4b 4b 6d 09 00 00 00 00 00 00 00 00 00 00
+>160c83	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 3 times (48 bytes)...
->160c74	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
->160c84	e9 e9 e9 e9 e9 e9 04 03 52 41 80 42 80 42 80 42
->160c94	80 42 80 42 80 42 41 80 e6 f7 f9 e9 f9 e9 f9 e9
->160ca4	f9 e9 f9 e9 f9 e9 f7 df 06 07 68 17 68 17 68 17
->160cb4	68 17 68 17 68 17 07 08 8a 4e 2d 6e 2d 6e 2d 6e
->160cc4	2d 6e 2d 6e 2d 6e 4e 1f 01 02 03 01 03 01 03 01
->160cd4	03 01 03 01 03 01 02 04 be ce bf df bf df bf df
->160ce4	bf df bf df bf df ce cf 66 46 66 17 66 17 66 17
->160cf4	66 17 66 17 66 17 46 26 00 09 4b 4b 6d 6d 4b 4b
->160d04	6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b
->160d14	6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b
->160d24	6d 6d 4b 4b 6d 6d 09 00 00 00 00 00 00 00 00 00
->160d34	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>160cc3	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
+>160cd3	e9 e9 e9 e9 e9 e9 04 03 52 41 80 42 80 42 80 42
+>160ce3	80 42 80 42 80 42 41 80 e6 f7 f9 e9 f9 e9 f9 e9
+>160cf3	f9 e9 f9 e9 f9 e9 f7 df 06 07 68 17 68 17 68 17
+>160d03	68 17 68 17 68 17 07 08 8a 4e 2d 6e 2d 6e 2d 6e
+>160d13	2d 6e 2d 6e 2d 6e 4e 1f 01 02 03 01 03 01 03 01
+>160d23	03 01 03 01 03 01 02 04 be ce bf df bf df bf df
+>160d33	bf df bf df bf df ce cf 66 46 66 17 66 17 66 17
+>160d43	66 17 66 17 66 17 46 26 00 09 4b 4b 6d 6d 4b 4b
+>160d53	6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b
+>160d63	6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b
+>160d73	6d 6d 4b 4b 6d 6d 09 00 00 00 00 00 00 00 00 00
+>160d83	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 3 times (48 bytes)...
->160d74	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
->160d84	e9 e9 e9 e9 e9 e9 04 03 52 41 42 80 42 80 42 80
->160d94	42 80 42 80 42 80 41 80 e6 f7 e9 f9 e9 f9 e9 f9
->160da4	e9 f9 e9 f9 e9 f9 f7 df 06 07 17 68 17 68 17 68
->160db4	17 68 17 68 17 68 07 08 8a 4e 6e 2d 6e 2d 6e 2d
->160dc4	6e 2d 6e 2d 6e 2d 4e 1f 01 02 01 03 01 03 01 03
->160dd4	01 03 01 03 01 03 02 04 be ce df bf df bf df bf
->160de4	df bf df bf df bf ce cf 66 46 17 66 17 66 17 66
->160df4	17 66 17 66 17 66 46 26 00 09 6d 6d 4b 4b 26 26
->160e04	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
->160e14	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
->160e24	4b 4b 26 26 4b 4b 09 1f 00 00 00 00 00 00 00 00
->160e34	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>160dc3	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
+>160dd3	e9 e9 e9 e9 e9 e9 04 03 52 41 42 80 42 80 42 80
+>160de3	42 80 42 80 42 80 41 80 e6 f7 e9 f9 e9 f9 e9 f9
+>160df3	e9 f9 e9 f9 e9 f9 f7 df 06 07 17 68 17 68 17 68
+>160e03	17 68 17 68 17 68 07 08 8a 4e 6e 2d 6e 2d 6e 2d
+>160e13	6e 2d 6e 2d 6e 2d 4e 1f 01 02 01 03 01 03 01 03
+>160e23	01 03 01 03 01 03 02 04 be ce df bf df bf df bf
+>160e33	df bf df bf df bf ce cf 66 46 17 66 17 66 17 66
+>160e43	17 66 17 66 17 66 46 26 00 09 6d 6d 4b 4b 26 26
+>160e53	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
+>160e63	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
+>160e73	4b 4b 26 26 4b 4b 09 1f 00 00 00 00 00 00 00 00
+>160e83	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 3 times (48 bytes)...
->160e74	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
->160e84	e9 e9 e9 e9 e9 e9 04 03 52 41 80 42 80 42 80 42
->160e94	80 42 80 42 80 42 41 80 e6 f7 f9 e9 f9 e9 f9 e9
->160ea4	f9 e9 f9 e9 f9 e9 f7 df 06 07 68 17 68 17 68 17
->160eb4	68 17 68 17 68 17 07 08 8a 4e 2d 6e 2d 6e 2d 6e
->160ec4	2d 6e 2d 6e 2d 6e 4e 1f 01 02 03 01 03 01 03 01
->160ed4	03 01 03 01 03 01 02 04 be ce bf df bf df bf df
->160ee4	bf df bf df bf df ce cf 66 46 66 17 66 17 66 17
->160ef4	66 17 66 17 66 17 46 26 00 09 6d 6d 4b 4b 26 26
->160f04	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
->160f14	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
->160f24	4b 4b 26 26 4b 4b 09 1f 00 00 00 00 00 00 00 00
->160f34	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>160ec3	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
+>160ed3	e9 e9 e9 e9 e9 e9 04 03 52 41 80 42 80 42 80 42
+>160ee3	80 42 80 42 80 42 41 80 e6 f7 f9 e9 f9 e9 f9 e9
+>160ef3	f9 e9 f9 e9 f9 e9 f7 df 06 07 68 17 68 17 68 17
+>160f03	68 17 68 17 68 17 07 08 8a 4e 2d 6e 2d 6e 2d 6e
+>160f13	2d 6e 2d 6e 2d 6e 4e 1f 01 02 03 01 03 01 03 01
+>160f23	03 01 03 01 03 01 02 04 be ce bf df bf df bf df
+>160f33	bf df bf df bf df ce cf 66 46 66 17 66 17 66 17
+>160f43	66 17 66 17 66 17 46 26 00 09 6d 6d 4b 4b 26 26
+>160f53	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
+>160f63	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
+>160f73	4b 4b 26 26 4b 4b 09 1f 00 00 00 00 00 00 00 00
+>160f83	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 3 times (48 bytes)...
->160f74	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
->160f84	e9 e9 e9 e9 e9 e9 04 03 52 41 42 80 42 80 42 80
->160f94	42 80 42 80 42 80 41 80 e6 f7 e9 f9 e9 f9 e9 f9
->160fa4	e9 f9 e9 f9 e9 f9 f7 df 06 07 17 68 17 68 17 68
->160fb4	17 68 17 68 17 68 07 08 8a 4e 6e 2d 6e 2d 6e 2d
->160fc4	6e 2d 6e 2d 6e 2d 4e 1f 01 02 01 03 01 03 01 03
->160fd4	01 03 01 03 01 03 02 04 be ce df bf df bf df bf
->160fe4	df bf df bf df bf ce cf 66 46 17 66 17 66 17 66
->160ff4	17 66 17 66 17 66 46 26 00 09 4b 4b 26 26 4b 4b
->161004	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
->161014	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
->161024	26 26 4b 4b 26 26 09 1f 00 00 00 00 00 00 00 00
->161034	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>160fc3	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
+>160fd3	e9 e9 e9 e9 e9 e9 04 03 52 41 42 80 42 80 42 80
+>160fe3	42 80 42 80 42 80 41 80 e6 f7 e9 f9 e9 f9 e9 f9
+>160ff3	e9 f9 e9 f9 e9 f9 f7 df 06 07 17 68 17 68 17 68
+>161003	17 68 17 68 17 68 07 08 8a 4e 6e 2d 6e 2d 6e 2d
+>161013	6e 2d 6e 2d 6e 2d 4e 1f 01 02 01 03 01 03 01 03
+>161023	01 03 01 03 01 03 02 04 be ce df bf df bf df bf
+>161033	df bf df bf df bf ce cf 66 46 17 66 17 66 17 66
+>161043	17 66 17 66 17 66 46 26 00 09 4b 4b 26 26 4b 4b
+>161053	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
+>161063	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
+>161073	26 26 4b 4b 26 26 09 1f 00 00 00 00 00 00 00 00
+>161083	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 3 times (48 bytes)...
->161074	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
->161084	e9 e9 e9 e9 e9 e9 04 03 52 41 80 42 80 42 80 42
->161094	80 42 80 42 80 42 41 80 e6 f7 f9 e9 f9 e9 f9 e9
->1610a4	f9 e9 f9 e9 f9 e9 f7 df 06 07 68 17 68 17 68 17
->1610b4	68 17 68 17 68 17 07 08 8a 4e 2d 6e 2d 6e 2d 6e
->1610c4	2d 6e 2d 6e 2d 6e 4e 1f 01 02 03 01 03 01 03 01
->1610d4	03 01 03 01 03 01 02 04 be ce bf df bf df bf df
->1610e4	bf df bf df bf df ce cf 66 46 66 17 66 17 66 17
->1610f4	66 17 66 17 66 17 46 26 00 09 4b 4b 26 26 4b 4b
->161104	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
->161114	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
->161124	26 26 4b 4b 26 26 09 1f 00 00 00 00 00 00 00 00
->161134	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>1610c3	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
+>1610d3	e9 e9 e9 e9 e9 e9 04 03 52 41 80 42 80 42 80 42
+>1610e3	80 42 80 42 80 42 41 80 e6 f7 f9 e9 f9 e9 f9 e9
+>1610f3	f9 e9 f9 e9 f9 e9 f7 df 06 07 68 17 68 17 68 17
+>161103	68 17 68 17 68 17 07 08 8a 4e 2d 6e 2d 6e 2d 6e
+>161113	2d 6e 2d 6e 2d 6e 4e 1f 01 02 03 01 03 01 03 01
+>161123	03 01 03 01 03 01 02 04 be ce bf df bf df bf df
+>161133	bf df bf df bf df ce cf 66 46 66 17 66 17 66 17
+>161143	66 17 66 17 66 17 46 26 00 09 4b 4b 26 26 4b 4b
+>161153	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
+>161163	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
+>161173	26 26 4b 4b 26 26 09 1f 00 00 00 00 00 00 00 00
+>161183	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 3 times (48 bytes)...
->161174	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
->161184	e9 e9 e9 e9 e9 e9 04 03 52 41 42 80 42 80 42 80
->161194	42 80 42 80 42 80 41 80 e6 f7 e9 f9 e9 f9 e9 f9
->1611a4	e9 f9 e9 f9 e9 f9 f7 df 06 07 17 68 17 68 17 68
->1611b4	17 68 17 68 17 68 07 08 8a 4e 6e 2d 6e 2d 6e 2d
->1611c4	6e 2d 6e 2d 6e 2d 4e 1f 01 02 01 03 01 03 01 03
->1611d4	01 03 01 03 01 03 02 04 be ce df bf df bf df bf
->1611e4	df bf df bf df bf ce cf 66 46 17 66 17 66 17 66
->1611f4	17 66 17 66 17 66 46 26 00 09 6d 6d 4b 4b 26 26
->161204	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
->161214	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
->161224	4b 4b 26 26 4b 4b 09 1f 00 00 00 00 00 00 00 00
->161234	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>1611c3	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
+>1611d3	e9 e9 e9 e9 e9 e9 04 03 52 41 42 80 42 80 42 80
+>1611e3	42 80 42 80 42 80 41 80 e6 f7 e9 f9 e9 f9 e9 f9
+>1611f3	e9 f9 e9 f9 e9 f9 f7 df 06 07 17 68 17 68 17 68
+>161203	17 68 17 68 17 68 07 08 8a 4e 6e 2d 6e 2d 6e 2d
+>161213	6e 2d 6e 2d 6e 2d 4e 1f 01 02 01 03 01 03 01 03
+>161223	01 03 01 03 01 03 02 04 be ce df bf df bf df bf
+>161233	df bf df bf df bf ce cf 66 46 17 66 17 66 17 66
+>161243	17 66 17 66 17 66 46 26 00 09 6d 6d 4b 4b 26 26
+>161253	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
+>161263	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
+>161273	4b 4b 26 26 4b 4b 09 1f 00 00 00 00 00 00 00 00
+>161283	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 3 times (48 bytes)...
->161274	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
->161284	e9 e9 e9 e9 e9 e9 04 03 52 41 80 42 80 42 80 42
->161294	51 42 51 42 51 42 41 80 e6 f7 f9 e9 f9 e9 f9 e9
->1612a4	e7 e9 e7 e9 e7 e9 f7 df 06 07 68 17 68 17 68 17
->1612b4	36 67 36 67 36 17 07 08 8a 4e 2d 6e 2d 6e 2d 6e
->1612c4	4e 6e 4e 6e 4e 6e 4e 1f 01 02 03 01 03 01 03 01
->1612d4	01 01 01 01 01 01 02 04 be ce bf df bf df bf df
->1612e4	be df be df be df ce cf 66 46 66 17 66 17 66 17
->1612f4	05 17 05 17 05 17 46 26 00 09 6d 6d 4b 4b 26 26
->161304	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
->161314	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
->161324	4b 4b 26 26 4b 4b 09 1f 00 00 00 00 00 00 00 00
->161334	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>1612c3	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
+>1612d3	e9 e9 e9 e9 e9 e9 04 03 52 41 80 42 80 42 80 42
+>1612e3	51 42 51 42 51 42 41 80 e6 f7 f9 e9 f9 e9 f9 e9
+>1612f3	e7 e9 e7 e9 e7 e9 f7 df 06 07 68 17 68 17 68 17
+>161303	36 67 36 67 36 17 07 08 8a 4e 2d 6e 2d 6e 2d 6e
+>161313	4e 6e 4e 6e 4e 6e 4e 1f 01 02 03 01 03 01 03 01
+>161323	01 01 01 01 01 01 02 04 be ce bf df bf df bf df
+>161333	be df be df be df ce cf 66 46 66 17 66 17 66 17
+>161343	05 17 05 17 05 17 46 26 00 09 6d 6d 4b 4b 26 26
+>161353	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
+>161363	4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26
+>161373	4b 4b 26 26 4b 4b 09 1f 00 00 00 00 00 00 00 00
+>161383	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 3 times (48 bytes)...
->161374	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
->161384	e9 e9 e9 e9 e9 e9 04 03 52 41 42 80 42 80 42 51
->161394	42 51 42 51 42 80 41 80 e6 f7 e9 f9 e9 f9 e9 e7
->1613a4	e9 e7 e9 e7 e9 f9 f7 df 06 07 17 68 17 68 17 36
->1613b4	67 36 67 36 67 68 07 08 8a 4e 6e 2d 6e 2d 6e 4e
->1613c4	6e 4e 6e 4e 6e 2d 4e 1f 01 02 01 03 01 03 01 01
->1613d4	01 01 01 01 01 03 02 04 be ce df bf df bf df be
->1613e4	df be df be df bf ce cf 66 46 17 66 17 66 17 05
->1613f4	17 05 17 05 17 66 46 26 00 09 4b 4b 26 26 4b 4b
->161404	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
->161414	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
->161424	26 26 4b 4b 26 26 09 1f 00 00 00 00 00 00 00 00
->161434	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>1613c3	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
+>1613d3	e9 e9 e9 e9 e9 e9 04 03 52 41 42 80 42 80 42 51
+>1613e3	42 51 42 51 42 80 41 80 e6 f7 e9 f9 e9 f9 e9 e7
+>1613f3	e9 e7 e9 e7 e9 f9 f7 df 06 07 17 68 17 68 17 36
+>161403	67 36 67 36 67 68 07 08 8a 4e 6e 2d 6e 2d 6e 4e
+>161413	6e 4e 6e 4e 6e 2d 4e 1f 01 02 01 03 01 03 01 01
+>161423	01 01 01 01 01 03 02 04 be ce df bf df bf df be
+>161433	df be df be df bf ce cf 66 46 17 66 17 66 17 05
+>161443	17 05 17 05 17 66 46 26 00 09 4b 4b 26 26 4b 4b
+>161453	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
+>161463	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
+>161473	26 26 4b 4b 26 26 09 1f 00 00 00 00 00 00 00 00
+>161483	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 3 times (48 bytes)...
->161474	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
->161484	e9 e9 e9 e9 e9 e9 04 03 52 41 80 42 80 42 80 42
->161494	51 42 51 42 51 42 41 80 e6 f7 f9 e9 f9 e9 f9 e9
->1614a4	e7 e9 e7 e9 e7 e9 f7 df 06 07 68 17 68 17 68 67
->1614b4	36 67 36 67 36 17 07 08 8a 4e 2d 6e 2d 6e 2d 6e
->1614c4	4e 6e 4e 6e 4e 6e 4e 1f 01 02 03 01 03 01 03 01
->1614d4	01 01 01 01 01 01 02 04 be ce bf df bf df bf df
->1614e4	be df be df be df ce cf 66 46 66 17 66 17 66 17
->1614f4	05 17 05 17 05 17 46 26 00 09 4b 4b 26 26 4b 4b
->161504	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
->161514	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
->161524	26 26 4b 4b 26 26 09 1f 00 00 00 00 00 00 00 00
->161534	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>1614c3	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
+>1614d3	e9 e9 e9 e9 e9 e9 04 03 52 41 80 42 80 42 80 42
+>1614e3	51 42 51 42 51 42 41 80 e6 f7 f9 e9 f9 e9 f9 e9
+>1614f3	e7 e9 e7 e9 e7 e9 f7 df 06 07 68 17 68 17 68 67
+>161503	36 67 36 67 36 17 07 08 8a 4e 2d 6e 2d 6e 2d 6e
+>161513	4e 6e 4e 6e 4e 6e 4e 1f 01 02 03 01 03 01 03 01
+>161523	01 01 01 01 01 01 02 04 be ce bf df bf df bf df
+>161533	be df be df be df ce cf 66 46 66 17 66 17 66 17
+>161543	05 17 05 17 05 17 46 26 00 09 4b 4b 26 26 4b 4b
+>161553	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
+>161563	26 26 4b 4b 26 26 4b 4b 26 26 4b 4b 26 26 4b 4b
+>161573	26 26 4b 4b 26 26 09 1f 00 00 00 00 00 00 00 00
+>161583	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 3 times (48 bytes)...
->161574	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
->161584	e9 e9 e9 e9 e9 e9 04 03 52 41 42 80 42 80 42 51
->161594	42 51 42 51 42 80 41 80 e6 f7 e9 f9 e9 f9 e9 e7
->1615a4	e9 e7 e9 e7 e9 f9 f7 df 06 07 17 68 17 68 17 36
->1615b4	67 36 67 36 67 68 07 08 8a 4e 6e 2d 6e 2d 6e 4e
->1615c4	6e 4e 6e 4e 6e 2d 4e 1f 01 02 01 03 01 03 01 01
->1615d4	01 01 01 01 01 03 02 04 be ce df bf df bf df be
->1615e4	df be df be df bf ce cf 66 46 17 66 17 66 17 05
->1615f4	17 05 17 05 17 66 46 26 00 09 6d 6d 4b 4b 6d 6d
->161604	4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d
->161614	4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d
->161624	4b 4b 6d 6d 4b 4b 09 1f 00 00 00 00 00 00 00 00
->161634	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>1615c3	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
+>1615d3	e9 e9 e9 e9 e9 e9 04 03 52 41 42 80 42 80 42 51
+>1615e3	42 51 42 51 42 80 41 80 e6 f7 e9 f9 e9 f9 e9 e7
+>1615f3	e9 e7 e9 e7 e9 f9 f7 df 06 07 17 68 17 68 17 36
+>161603	67 36 67 36 67 68 07 08 8a 4e 6e 2d 6e 2d 6e 4e
+>161613	6e 4e 6e 4e 6e 2d 4e 1f 01 02 01 03 01 03 01 01
+>161623	01 01 01 01 01 03 02 04 be ce df bf df bf df be
+>161633	df be df be df bf ce cf 66 46 17 66 17 66 17 05
+>161643	17 05 17 05 17 66 46 26 00 09 6d 6d 4b 4b 6d 6d
+>161653	4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d
+>161663	4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d
+>161673	4b 4b 6d 6d 4b 4b 09 1f 00 00 00 00 00 00 00 00
+>161683	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 3 times (48 bytes)...
->161674	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
->161684	e9 e9 e9 e9 e9 e9 04 03 52 41 80 42 80 42 80 42
->161694	80 42 80 42 80 42 41 80 e6 f7 f9 e9 f9 e9 f9 e9
->1616a4	f9 e9 f9 e9 f9 e9 f7 df 06 07 68 17 68 17 68 17
->1616b4	68 67 68 17 68 17 07 08 8a 4e 2d 6e 2d 6e 2d 6e
->1616c4	2d 6e 2d 6e 2d 6e 4e 1f 01 02 03 01 03 01 03 01
->1616d4	03 01 03 01 03 01 02 04 be ce bf df bf df bf df
->1616e4	bf df bf df bf df ce cf 66 46 66 17 66 17 66 17
->1616f4	66 17 66 17 66 17 46 26 00 00 09 6d 4b 4b 6d 6d
->161704	4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d
->161714	4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d
->161724	4b 4b 6d 6d 4b 09 1f 1f 00 00 00 00 00 00 00 00
->161734	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>1616c3	00 00 00 00 00 00 00 00 03 01 e9 e9 e9 e9 e9 e9
+>1616d3	e9 e9 e9 e9 e9 e9 04 03 52 41 80 42 80 42 80 42
+>1616e3	80 42 80 42 80 42 41 80 e6 f7 f9 e9 f9 e9 f9 e9
+>1616f3	f9 e9 f9 e9 f9 e9 f7 df 06 07 68 17 68 17 68 17
+>161703	68 67 68 17 68 17 07 08 8a 4e 2d 6e 2d 6e 2d 6e
+>161713	2d 6e 2d 6e 2d 6e 4e 1f 01 02 03 01 03 01 03 01
+>161723	03 01 03 01 03 01 02 04 be ce bf df bf df bf df
+>161733	bf df bf df bf df ce cf 66 46 66 17 66 17 66 17
+>161743	66 17 66 17 66 17 46 26 00 00 09 6d 4b 4b 6d 6d
+>161753	4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d
+>161763	4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d 4b 4b 6d 6d
+>161773	4b 4b 6d 6d 4b 09 1f 1f 00 00 00 00 00 00 00 00
+>161783	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 3 times (48 bytes)...
->161774	00 00 00 00 00 00 00 00 03 00 04 04 04 04 04 04
->161784	04 04 04 04 04 04 04 03 52 41 41 41 41 41 41 41
->161794	41 41 41 41 41 41 41 80 e6 f7 f7 f7 f7 f7 f7 f7
->1617a4	f7 f7 f7 f7 f7 f7 f7 df 06 07 07 07 07 07 07 07
->1617b4	07 07 07 07 07 07 07 08 8a 4e 4e 4e 4e 4e 4e 4e
->1617c4	4e 4e 4e 4e 4e 4e 4e 1f 01 02 02 02 02 02 02 02
->1617d4	02 02 02 02 02 02 02 04 be ce ce ce ce ce ce ce
->1617e4	ce ce ce ce ce ce ce cf 66 46 46 46 46 46 46 46
->1617f4	46 46 46 46 46 46 46 26 00 00 00 09 09 09 09 09
->161804	09 09 09 09 09 09 09 09 09 09 09 09 09 09 09 09
->161814	09 09 09 09 09 09 09 09 09 09 09 09 09 09 09 09
->161824	09 09 09 09 09 1f 1f 00 00 00 00 00 00 00 00 00
->161834	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>1617c3	00 00 00 00 00 00 00 00 03 00 04 04 04 04 04 04
+>1617d3	04 04 04 04 04 04 04 03 52 41 41 41 41 41 41 41
+>1617e3	41 41 41 41 41 41 41 80 e6 f7 f7 f7 f7 f7 f7 f7
+>1617f3	f7 f7 f7 f7 f7 f7 f7 df 06 07 07 07 07 07 07 07
+>161803	07 07 07 07 07 07 07 08 8a 4e 4e 4e 4e 4e 4e 4e
+>161813	4e 4e 4e 4e 4e 4e 4e 1f 01 02 02 02 02 02 02 02
+>161823	02 02 02 02 02 02 02 04 be ce ce ce ce ce ce ce
+>161833	ce ce ce ce ce ce ce cf 66 46 46 46 46 46 46 46
+>161843	46 46 46 46 46 46 46 26 00 00 00 09 09 09 09 09
+>161853	09 09 09 09 09 09 09 09 09 09 09 09 09 09 09 09
+>161863	09 09 09 09 09 09 09 09 09 09 09 09 09 09 09 09
+>161873	09 09 09 09 09 1f 1f 00 00 00 00 00 00 00 00 00
+>161883	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 3 times (48 bytes)...
->161874	00 00 00 00 00 00 00 00 03 03 03 03 03 03 03 03
->161884	03 03 03 03 03 03 03 03 00 80 80 80 80 80 80 80
->161894	80 80 80 80 80 80 80 00 00 df df df df df df df
->1618a4	df df df df df df df 00 00 08 08 08 08 08 08 08
->1618b4	08 08 08 08 08 08 08 00 00 1f 1f 1f 1f 1f 1f 1f
->1618c4	1f 1f 1f 1f 1f 1f 1f 00 00 04 04 04 04 04 04 04
->1618d4	04 04 04 04 04 04 04 00 00 cf cf cf cf cf cf cf
->1618e4	cf cf cf cf cf cf cf 00 00 26 26 26 26 26 26 26
->1618f4	26 26 26 26 26 26 26 00 00 00 00 00 1f 1f 1f 1f
->161904	1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f
->161914	1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f
->161924	1f 1f 1f 1f 1f 1f 00 00 00 00 00 00 00 00 00 00
->161934	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>1618c3	00 00 00 00 00 00 00 00 03 03 03 03 03 03 03 03
+>1618d3	03 03 03 03 03 03 03 03 00 80 80 80 80 80 80 80
+>1618e3	80 80 80 80 80 80 80 00 00 df df df df df df df
+>1618f3	df df df df df df df 00 00 08 08 08 08 08 08 08
+>161903	08 08 08 08 08 08 08 00 00 1f 1f 1f 1f 1f 1f 1f
+>161913	1f 1f 1f 1f 1f 1f 1f 00 00 04 04 04 04 04 04 04
+>161923	04 04 04 04 04 04 04 00 00 cf cf cf cf cf cf cf
+>161933	cf cf cf cf cf cf cf 00 00 26 26 26 26 26 26 26
+>161943	26 26 26 26 26 26 26 00 00 00 00 00 1f 1f 1f 1f
+>161953	1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f
+>161963	1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f 1f
+>161973	1f 1f 1f 1f 1f 1f 00 00 00 00 00 00 00 00 00 00
+>161983	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ;	...repeated 2 times (32 bytes)...
->161964	00 00 00 00 00 00 00 00
-.16196c					BACKGROUND_PAL
->16196c	1a 0a 07 00 09 0c 09 00		.binary "background.data.pal"
->161974	09 0a 10 00 0b 0a 17 00 09 12 06 00 1e 12 03 00
->161984	08 0d 1d 00 0a 07 33 00 08 10 17 00 15 14 07 00
->161994	08 12 12 00 0b 0e 23 00 37 12 0b 00 0b 0c 2b 00
->1619a4	05 11 1f 00 0b 07 3e 00 20 13 19 00 09 1c 06 00
->1619b4	0c 15 23 00 14 19 15 00 32 1d 04 00 1b 1b 12 00
->1619c4	16 17 22 00 0d 1b 18 00 18 20 08 00 07 20 0e 00
->1619d4	16 1a 1e 00 09 1b 1f 00 0a 13 39 00 08 19 27 00
->1619e4	05 11 43 00 1f 1b 1d 00 26 1f 11 00 09 26 07 00
->1619f4	07 1e 24 00 1b 1f 1d 00 2a 1a 39 00 2b 27 1a 00
->161a04	22 25 24 00 29 25 27 00 17 14 64 00 2a 27 23 00
->161a14	06 32 0b 00 17 28 28 00 37 2b 19 00 12 1b 57 00
->161a24	11 29 2d 00 08 18 6d 00 37 32 0d 00 23 28 37 00
->161a34	17 37 0b 00 16 29 3c 00 13 24 4e 00 0a 2f 33 00
->161a44	1a 34 1f 00 2c 39 0b 00 36 2b 36 00 25 21 5b 00
->161a54	2c 34 1c 00 0c 21 62 00 0a 35 24 00 57 32 19 00
->161a64	0a 2c 42 00 22 27 4c 00 0c 3e 10 00 08 2b 55 00
->161a74	00 41 16 00 2c 37 34 00 0c 2a 80 00 23 22 94 00
->161a84	18 2b 7b 00 10 29 94 00 11 53 15 00 22 54 10 00
->161a94	30 53 10 00 3d 52 10 00 10 4e 2b 00 85 3a 50 00
->161aa4	36 33 80 00 20 38 78 00 4f 58 07 00 6a 55 0d 00
->161ab4	4c 50 26 00 17 45 5b 00 2f 51 2f 00 66 4c 33 00
->161ac4	3f 50 31 00 30 3e 70 00 17 4c 4a 00 32 46 59 00
->161ad4	51 4c 3e 00 46 46 55 00 22 41 70 00 24 38 8d 00
->161ae4	18 38 91 00 09 42 75 00 43 30 a0 00 42 4a 4d 00
->161af4	43 4e 42 00 3e 41 6e 00 34 50 42 00 06 4a 63 00
->161b04	35 4d 4e 00 08 5f 3c 00 0b 66 26 00 37 37 b2 00
->161b14	21 3f ad 00 23 45 a1 00 68 43 95 00 63 4f 76 00
->161b24	09 42 bc 00 34 4a a2 00 68 74 12 00 32 79 17 00
->161b34	48 75 22 00 14 64 67 00 52 4f 9e 00 81 70 2a 00
->161b44	09 53 b0 00 1a 5b 96 00 32 71 49 00 4b 6f 4b 00
->161b54	3c 5a 94 00 2f 54 b0 00 66 70 48 00 15 65 83 00
->161b64	59 5d 8b 00 4c 5d 90 00 65 64 75 00 60 68 6a 00
->161b74	44 6b 68 00 4f 65 79 00 60 6c 61 00 86 6c 57 00
->161b84	52 6c 66 00 72 6c 5e 00 39 67 7f 00 38 6d 6d 00
->161b94	ad 77 30 00 39 5e cf 00 5f 61 ca 00 43 93 36 00
->161ba4	41 69 be 00 c2 89 38 00 bc 89 40 00 9f 93 33 00
->161bb4	8c 9b 23 00 2f 72 c9 00 67 97 43 00 14 70 d9 00
->161bc4	cc 7d 84 00 23 86 9b 00 87 92 5d 00 4b 8a 88 00
->161bd4	6c 7f a5 00 4b 85 9b 00 6e 78 be 00 6c 8b 82 00
->161be4	85 81 9e 00 6d 87 92 00 7d 8c 7e 00 a0 86 89 00
->161bf4	c8 97 49 00 7e 88 8e 00 be 97 4d 00 a1 90 6c 00
->161c04	50 80 b6 00 8f 8e 79 00 8d 89 8b 00 44 97 73 00
->161c14	b5 97 57 00 31 83 bc 00 0e 85 c1 00 8e 7e bc 00
->161c24	72 99 72 00 d4 a6 58 00 cd a6 5a 00 d9 99 8d 00
->161c34	c7 a7 66 00 c8 b3 5a 00 ad a7 91 00 c0 a1 a1 00
->161c44	17 a5 c3 00 db b5 5e 00 bc aa 8a 00 43 a5 bd 00
->161c54	8b 9e c2 00 a8 b1 7e 00 68 a6 b4 00 dd b4 69 00
->161c64	8b aa a1 00 d6 b5 6f 00 d3 b3 7a 00 a5 a2 be 00
->161c74	9e ad 9e 00 e4 a5 a6 00 8e a8 b5 00 cf b2 85 00
->161c84	9f a9 b0 00 cc b0 8e 00 ad aa ab 00 a9 b0 9f 00
->161c94	cf b7 81 00 2c a7 e6 00 bb b7 a1 00 e5 c0 79 00
->161ca4	58 ab e8 00 dc c4 75 00 e8 b9 99 00 df c2 8a 00
->161cb4	dc c0 94 00 7a b0 e3 00 d4 c0 99 00 dc be 9f 00
->161cc4	ec c9 84 00 d2 c2 a2 00 cc d4 78 00 e8 d4 72 00
->161cd4	d7 cd 90 00 b6 d3 89 00 ca cc 9f 00 c5 c5 b7 00
->161ce4	f2 cf 8c 00 eb cc 98 00 c9 c0 c9 00 c0 c5 be 00
->161cf4	ed d1 90 00 d3 c9 b3 00 e7 cb a8 00 e7 ce 9f 00
->161d04	e2 cd a7 00 ea c8 b7 00 bc ce b2 00 bd c8 c8 00
->161d14	e0 d0 b0 00 aa c8 df 00 69 cc e6 00 af cf cd 00
->161d24	8e cd e1 00 35 d2 eb 00 e1 e2 8a 00 eb d4 b5 00
->161d34	ef d8 ab 00 e0 d9 b7 00 de cf d9 00 f2 d3 c7 00
->161d44	f7 e2 97 00 e9 d8 bc 00 d8 d7 cb 00 d2 d7 ce 00
->161d54	e2 d9 c5 00 ec f0 b9 00 ec e7 da 00 db e6 e6 00
->161d64	e3 e7 e3 00
-.161d68					PALETTE
->161d68	00 00 00 00 cc cc cc 00		.binary "tetris-tiles.data.pal"
->161d70	99 99 99 00 66 66 66 00 33 33 33 00 ff ff ff 00
->161d80	00 cc ff 00 00 99 ff 00 00 66 ff 00 00 33 ff 00
->161d90	00 00 00 00 33 33 33 00 66 66 66 00 99 99 99 00
->161da0	cc cc cc 00 ff ff ff 00 00 cc 99 00 00 00 00 00
->161db0	00 00 00 00 00 00 00 00 00 00 00 00 00 99 cc 00
->161dc0	33 cc ff 00 66 cc ff 00 66 99 ff 00 33 66 ff 00
->161dd0	00 33 cc 00 00 00 00 00 00 00 00 00 00 00 00 00
->161de0	00 00 00 00 33 00 cc 00 00 ff cc 00 33 ff cc 00
->161df0	00 33 33 00 00 66 66 00 00 99 99 00 00 cc cc 00
->161e00	00 ff ff 00 33 99 cc 00 33 66 cc 00 00 00 33 00
->161e10	00 00 66 00 00 00 99 00 00 00 cc 00 00 00 ff 00
->161e20	66 33 ff 00 33 00 ff 00 00 ff 99 00 66 ff cc 00
->161e30	33 cc 99 00 33 66 66 00 33 99 99 00 33 cc cc 00
->161e40	33 ff ff 00 00 66 99 00 00 33 99 00 33 33 66 00
->161e50	33 33 99 00 33 33 cc 00 33 33 ff 00 66 33 cc 00
->161e60	99 66 ff 00 66 00 ff 00 00 ff 66 00 66 ff 99 00
->161e70	33 cc 66 00 00 99 66 00 66 99 99 00 66 cc cc 00
->161e80	66 ff ff 00 33 66 99 00 00 33 66 00 66 66 99 00
->161e90	66 66 cc 00 66 66 ff 00 33 00 99 00 99 33 cc 00
->161ea0	cc 66 ff 00 99 00 ff 00 00 ff 33 00 33 ff 66 00
->161eb0	00 99 33 00 00 cc 66 00 33 ff 99 00 99 cc cc 00
->161ec0	99 ff ff 00 66 99 cc 00 00 66 cc 00 99 99 cc 00
->161ed0	99 99 ff 00 99 33 ff 00 66 00 cc 00 66 00 99 00
->161ee0	cc 33 ff 00 cc 00 ff 00 00 cc 00 00 00 cc 33 00
->161ef0	00 66 33 00 33 99 66 00 66 cc 99 00 99 ff cc 00
->161f00	cc ff ff 00 99 cc ff 00 33 99 ff 00 cc cc ff 00
->161f10	cc 99 ff 00 99 66 cc 00 66 33 99 00 33 00 66 00
->161f20	99 00 cc 00 33 00 33 00 33 cc 33 00 66 cc 66 00
->161f30	00 ff 00 00 33 ff 33 00 66 ff 66 00 99 ff 99 00
->161f40	cc ff cc 00 00 00 00 00 00 00 00 00 00 00 00 00
->161f50	cc 99 cc 00 99 66 99 00 99 33 99 00 99 00 99 00
->161f60	66 33 66 00 66 00 66 00 00 66 00 00 33 66 33 00
->161f70	00 99 00 00 33 99 33 00 66 99 66 00 99 cc 99 00
->161f80	00 00 00 00 00 00 00 00 00 00 00 00 ff cc ff 00
->161f90	ff 99 ff 00 ff 66 ff 00 ff 33 ff 00 ff 00 ff 00
->161fa0	cc 66 cc 00 cc 33 cc 00 00 33 00 00 33 cc 00 00
->161fb0	33 66 00 00 66 99 33 00 99 cc 66 00 cc ff 99 00
->161fc0	ff ff cc 00 ff 99 33 00 ff cc 99 00 ff cc cc 00
->161fd0	ff 99 cc 00 cc 66 99 00 99 33 66 00 66 00 33 00
->161fe0	cc 00 99 00 cc 00 cc 00 33 ff 00 00 66 ff 33 00
->161ff0	33 99 00 00 66 cc 00 00 99 ff 33 00 ff ff 99 00
->162000	cc cc 99 00 cc 66 00 00 cc 99 66 00 ff 99 99 00
->162010	cc 99 99 00 ff 33 99 00 cc 00 66 00 99 00 66 00
->162020	ff 33 cc 00 ff 00 cc 00 66 ff 00 00 99 ff 66 00
->162030	66 cc 33 00 66 99 00 00 ff ff 66 00 cc cc 66 00
->162040	99 99 66 00 66 33 00 00 99 66 33 00 ff 66 66 00
->162050	cc 66 66 00 99 66 66 00 99 00 33 00 cc 33 99 00
->162060	ff 66 cc 00 ff 00 99 00 99 ff 00 00 cc ff 66 00
->162070	99 cc 33 00 ff ff 33 00 cc cc 33 00 99 99 33 00
->162080	66 66 33 00 99 66 00 00 99 33 00 00 ff 33 33 00
->162090	cc 33 33 00 99 33 33 00 66 33 33 00 cc 33 66 00
->1620a0	ff 66 99 00 ff 00 66 00 cc ff 00 00 cc ff 33 00
->1620b0	ff ff 00 00 cc cc 00 00 99 99 00 00 66 66 00 00
->1620c0	33 33 00 00 cc 99 33 00 cc 66 33 00 ff 00 00 00
->1620d0	cc 00 00 00 99 00 00 00 66 00 00 00 33 00 00 00
->1620e0	ff 33 66 00 ff 00 33 00 99 cc 00 00 00 00 00 00
->1620f0	00 00 00 00 00 00 00 00 00 00 00 00 ca 99 00 00
->162100	ff cc 33 00 ff cc 66 00 ff 99 66 00 ff 66 33 00
->162110	cc 33 00 00 00 00 00 00 00 00 00 00 00 00 00 00
->162120	00 00 00 00 cc 00 33 00 ff ff ff 00 cc cc cc 00
->162130	99 99 99 00 66 66 66 00 33 33 33 00 00 00 00 00
->162140	ff cc 00 00 ff 99 00 00 ff 66 00 00 ff 33 00 00
->162150	00 00 00 00 33 33 33 00 66 66 66 00 99 99 99 00
->162160	cc cc cc 00 ff ff ff 00
+>1619b3	00 00 00 00 00 00 00 00
+.1619bb					BACKGROUND_PAL
+>1619bb	1a 0a 07 00 09 0c 09 00		.binary "background.data.pal"
+>1619c3	09 0a 10 00 0b 0a 17 00 09 12 06 00 1e 12 03 00
+>1619d3	08 0d 1d 00 0a 07 33 00 08 10 17 00 15 14 07 00
+>1619e3	08 12 12 00 0b 0e 23 00 37 12 0b 00 0b 0c 2b 00
+>1619f3	05 11 1f 00 0b 07 3e 00 20 13 19 00 09 1c 06 00
+>161a03	0c 15 23 00 14 19 15 00 32 1d 04 00 1b 1b 12 00
+>161a13	16 17 22 00 0d 1b 18 00 18 20 08 00 07 20 0e 00
+>161a23	16 1a 1e 00 09 1b 1f 00 0a 13 39 00 08 19 27 00
+>161a33	05 11 43 00 1f 1b 1d 00 26 1f 11 00 09 26 07 00
+>161a43	07 1e 24 00 1b 1f 1d 00 2a 1a 39 00 2b 27 1a 00
+>161a53	22 25 24 00 29 25 27 00 17 14 64 00 2a 27 23 00
+>161a63	06 32 0b 00 17 28 28 00 37 2b 19 00 12 1b 57 00
+>161a73	11 29 2d 00 08 18 6d 00 37 32 0d 00 23 28 37 00
+>161a83	17 37 0b 00 16 29 3c 00 13 24 4e 00 0a 2f 33 00
+>161a93	1a 34 1f 00 2c 39 0b 00 36 2b 36 00 25 21 5b 00
+>161aa3	2c 34 1c 00 0c 21 62 00 0a 35 24 00 57 32 19 00
+>161ab3	0a 2c 42 00 22 27 4c 00 0c 3e 10 00 08 2b 55 00
+>161ac3	00 41 16 00 2c 37 34 00 0c 2a 80 00 23 22 94 00
+>161ad3	18 2b 7b 00 10 29 94 00 11 53 15 00 22 54 10 00
+>161ae3	30 53 10 00 3d 52 10 00 10 4e 2b 00 85 3a 50 00
+>161af3	36 33 80 00 20 38 78 00 4f 58 07 00 6a 55 0d 00
+>161b03	4c 50 26 00 17 45 5b 00 2f 51 2f 00 66 4c 33 00
+>161b13	3f 50 31 00 30 3e 70 00 17 4c 4a 00 32 46 59 00
+>161b23	51 4c 3e 00 46 46 55 00 22 41 70 00 24 38 8d 00
+>161b33	18 38 91 00 09 42 75 00 43 30 a0 00 42 4a 4d 00
+>161b43	43 4e 42 00 3e 41 6e 00 34 50 42 00 06 4a 63 00
+>161b53	35 4d 4e 00 08 5f 3c 00 0b 66 26 00 37 37 b2 00
+>161b63	21 3f ad 00 23 45 a1 00 68 43 95 00 63 4f 76 00
+>161b73	09 42 bc 00 34 4a a2 00 68 74 12 00 32 79 17 00
+>161b83	48 75 22 00 14 64 67 00 52 4f 9e 00 81 70 2a 00
+>161b93	09 53 b0 00 1a 5b 96 00 32 71 49 00 4b 6f 4b 00
+>161ba3	3c 5a 94 00 2f 54 b0 00 66 70 48 00 15 65 83 00
+>161bb3	59 5d 8b 00 4c 5d 90 00 65 64 75 00 60 68 6a 00
+>161bc3	44 6b 68 00 4f 65 79 00 60 6c 61 00 86 6c 57 00
+>161bd3	52 6c 66 00 72 6c 5e 00 39 67 7f 00 38 6d 6d 00
+>161be3	ad 77 30 00 39 5e cf 00 5f 61 ca 00 43 93 36 00
+>161bf3	41 69 be 00 c2 89 38 00 bc 89 40 00 9f 93 33 00
+>161c03	8c 9b 23 00 2f 72 c9 00 67 97 43 00 14 70 d9 00
+>161c13	cc 7d 84 00 23 86 9b 00 87 92 5d 00 4b 8a 88 00
+>161c23	6c 7f a5 00 4b 85 9b 00 6e 78 be 00 6c 8b 82 00
+>161c33	85 81 9e 00 6d 87 92 00 7d 8c 7e 00 a0 86 89 00
+>161c43	c8 97 49 00 7e 88 8e 00 be 97 4d 00 a1 90 6c 00
+>161c53	50 80 b6 00 8f 8e 79 00 8d 89 8b 00 44 97 73 00
+>161c63	b5 97 57 00 31 83 bc 00 0e 85 c1 00 8e 7e bc 00
+>161c73	72 99 72 00 d4 a6 58 00 cd a6 5a 00 d9 99 8d 00
+>161c83	c7 a7 66 00 c8 b3 5a 00 ad a7 91 00 c0 a1 a1 00
+>161c93	17 a5 c3 00 db b5 5e 00 bc aa 8a 00 43 a5 bd 00
+>161ca3	8b 9e c2 00 a8 b1 7e 00 68 a6 b4 00 dd b4 69 00
+>161cb3	8b aa a1 00 d6 b5 6f 00 d3 b3 7a 00 a5 a2 be 00
+>161cc3	9e ad 9e 00 e4 a5 a6 00 8e a8 b5 00 cf b2 85 00
+>161cd3	9f a9 b0 00 cc b0 8e 00 ad aa ab 00 a9 b0 9f 00
+>161ce3	cf b7 81 00 2c a7 e6 00 bb b7 a1 00 e5 c0 79 00
+>161cf3	58 ab e8 00 dc c4 75 00 e8 b9 99 00 df c2 8a 00
+>161d03	dc c0 94 00 7a b0 e3 00 d4 c0 99 00 dc be 9f 00
+>161d13	ec c9 84 00 d2 c2 a2 00 cc d4 78 00 e8 d4 72 00
+>161d23	d7 cd 90 00 b6 d3 89 00 ca cc 9f 00 c5 c5 b7 00
+>161d33	f2 cf 8c 00 eb cc 98 00 c9 c0 c9 00 c0 c5 be 00
+>161d43	ed d1 90 00 d3 c9 b3 00 e7 cb a8 00 e7 ce 9f 00
+>161d53	e2 cd a7 00 ea c8 b7 00 bc ce b2 00 bd c8 c8 00
+>161d63	e0 d0 b0 00 aa c8 df 00 69 cc e6 00 af cf cd 00
+>161d73	8e cd e1 00 35 d2 eb 00 e1 e2 8a 00 eb d4 b5 00
+>161d83	ef d8 ab 00 e0 d9 b7 00 de cf d9 00 f2 d3 c7 00
+>161d93	f7 e2 97 00 e9 d8 bc 00 d8 d7 cb 00 d2 d7 ce 00
+>161da3	e2 d9 c5 00 ec f0 b9 00 ec e7 da 00 db e6 e6 00
+>161db3	e3 e7 e3 00
+.161db7					PALETTE
+>161db7	00 00 00 00 cc cc cc 00		.binary "tetris-tiles.data.pal"
+>161dbf	99 99 99 00 66 66 66 00 33 33 33 00 ff ff ff 00
+>161dcf	00 cc ff 00 00 99 ff 00 00 66 ff 00 00 33 ff 00
+>161ddf	00 00 00 00 33 33 33 00 66 66 66 00 99 99 99 00
+>161def	cc cc cc 00 ff ff ff 00 00 cc 99 00 00 00 00 00
+>161dff	00 00 00 00 00 00 00 00 00 00 00 00 00 99 cc 00
+>161e0f	33 cc ff 00 66 cc ff 00 66 99 ff 00 33 66 ff 00
+>161e1f	00 33 cc 00 00 00 00 00 00 00 00 00 00 00 00 00
+>161e2f	00 00 00 00 33 00 cc 00 00 ff cc 00 33 ff cc 00
+>161e3f	00 33 33 00 00 66 66 00 00 99 99 00 00 cc cc 00
+>161e4f	00 ff ff 00 33 99 cc 00 33 66 cc 00 00 00 33 00
+>161e5f	00 00 66 00 00 00 99 00 00 00 cc 00 00 00 ff 00
+>161e6f	66 33 ff 00 33 00 ff 00 00 ff 99 00 66 ff cc 00
+>161e7f	33 cc 99 00 33 66 66 00 33 99 99 00 33 cc cc 00
+>161e8f	33 ff ff 00 00 66 99 00 00 33 99 00 33 33 66 00
+>161e9f	33 33 99 00 33 33 cc 00 33 33 ff 00 66 33 cc 00
+>161eaf	99 66 ff 00 66 00 ff 00 00 ff 66 00 66 ff 99 00
+>161ebf	33 cc 66 00 00 99 66 00 66 99 99 00 66 cc cc 00
+>161ecf	66 ff ff 00 33 66 99 00 00 33 66 00 66 66 99 00
+>161edf	66 66 cc 00 66 66 ff 00 33 00 99 00 99 33 cc 00
+>161eef	cc 66 ff 00 99 00 ff 00 00 ff 33 00 33 ff 66 00
+>161eff	00 99 33 00 00 cc 66 00 33 ff 99 00 99 cc cc 00
+>161f0f	99 ff ff 00 66 99 cc 00 00 66 cc 00 99 99 cc 00
+>161f1f	99 99 ff 00 99 33 ff 00 66 00 cc 00 66 00 99 00
+>161f2f	cc 33 ff 00 cc 00 ff 00 00 cc 00 00 00 cc 33 00
+>161f3f	00 66 33 00 33 99 66 00 66 cc 99 00 99 ff cc 00
+>161f4f	cc ff ff 00 99 cc ff 00 33 99 ff 00 cc cc ff 00
+>161f5f	cc 99 ff 00 99 66 cc 00 66 33 99 00 33 00 66 00
+>161f6f	99 00 cc 00 33 00 33 00 33 cc 33 00 66 cc 66 00
+>161f7f	00 ff 00 00 33 ff 33 00 66 ff 66 00 99 ff 99 00
+>161f8f	cc ff cc 00 00 00 00 00 00 00 00 00 00 00 00 00
+>161f9f	cc 99 cc 00 99 66 99 00 99 33 99 00 99 00 99 00
+>161faf	66 33 66 00 66 00 66 00 00 66 00 00 33 66 33 00
+>161fbf	00 99 00 00 33 99 33 00 66 99 66 00 99 cc 99 00
+>161fcf	00 00 00 00 00 00 00 00 00 00 00 00 ff cc ff 00
+>161fdf	ff 99 ff 00 ff 66 ff 00 ff 33 ff 00 ff 00 ff 00
+>161fef	cc 66 cc 00 cc 33 cc 00 00 33 00 00 33 cc 00 00
+>161fff	33 66 00 00 66 99 33 00 99 cc 66 00 cc ff 99 00
+>16200f	ff ff cc 00 ff 99 33 00 ff cc 99 00 ff cc cc 00
+>16201f	ff 99 cc 00 cc 66 99 00 99 33 66 00 66 00 33 00
+>16202f	cc 00 99 00 cc 00 cc 00 33 ff 00 00 66 ff 33 00
+>16203f	33 99 00 00 66 cc 00 00 99 ff 33 00 ff ff 99 00
+>16204f	cc cc 99 00 cc 66 00 00 cc 99 66 00 ff 99 99 00
+>16205f	cc 99 99 00 ff 33 99 00 cc 00 66 00 99 00 66 00
+>16206f	ff 33 cc 00 ff 00 cc 00 66 ff 00 00 99 ff 66 00
+>16207f	66 cc 33 00 66 99 00 00 ff ff 66 00 cc cc 66 00
+>16208f	99 99 66 00 66 33 00 00 99 66 33 00 ff 66 66 00
+>16209f	cc 66 66 00 99 66 66 00 99 00 33 00 cc 33 99 00
+>1620af	ff 66 cc 00 ff 00 99 00 99 ff 00 00 cc ff 66 00
+>1620bf	99 cc 33 00 ff ff 33 00 cc cc 33 00 99 99 33 00
+>1620cf	66 66 33 00 99 66 00 00 99 33 00 00 ff 33 33 00
+>1620df	cc 33 33 00 99 33 33 00 66 33 33 00 cc 33 66 00
+>1620ef	ff 66 99 00 ff 00 66 00 cc ff 00 00 cc ff 33 00
+>1620ff	ff ff 00 00 cc cc 00 00 99 99 00 00 66 66 00 00
+>16210f	33 33 00 00 cc 99 33 00 cc 66 33 00 ff 00 00 00
+>16211f	cc 00 00 00 99 00 00 00 66 00 00 00 33 00 00 00
+>16212f	ff 33 66 00 ff 00 33 00 99 cc 00 00 00 00 00 00
+>16213f	00 00 00 00 00 00 00 00 00 00 00 00 ca 99 00 00
+>16214f	ff cc 33 00 ff cc 66 00 ff 99 66 00 ff 66 33 00
+>16215f	cc 33 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>16216f	00 00 00 00 cc 00 33 00 ff ff ff 00 cc cc cc 00
+>16217f	99 99 99 00 66 66 66 00 33 33 33 00 00 00 00 00
+>16218f	ff cc 00 00 ff 99 00 00 ff 66 00 00 ff 33 00 00
+>16219f	00 00 00 00 33 33 33 00 66 66 66 00 99 99 99 00
+>1621af	cc cc cc 00 ff ff ff 00
 .170000					BACKGROUND
 >170000	a4 90 a4 90 a4 a4 a4 a4		.binary "background.data"
 >170008	aa a4 a4 a4 a4 a4 a4 a4 a4 a4 a4 a4 a4 a4 a4 a4

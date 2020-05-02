@@ -84,6 +84,10 @@ KEYBOARD_INTERRUPT
                 LDA LAST_KEY
                 TAX
                 BEQ DONT_REACT
+                LDA GAME_STATE
+                CMP #3
+                BEQ DONT_REACT
+                
                 JSR (KEY_JUMP_TABLE,X)
     DONT_REACT
                 RTS
@@ -108,12 +112,12 @@ SOF_INTERRUPT
                 
                 LDA GAME_STATE  ; The SOF is still getting called, even when masked
                 BNE SKIP_SOF 
-                JSR DISPLAY_BOARD
+                JSR DISPLAY_BOARD_LOOP
                 BRA SOF_DONE
     SKIP_SOF
                 CMP #3
                 BNE SOF_DONE
-                JSR REMOVE_LINES
+                JSR REMOVE_LINES_LOOP
     SOF_DONE
                 RTS
 
