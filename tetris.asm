@@ -5,6 +5,7 @@
 .cpu "65816"
 .include "macros_inc.asm"
 .include "bank_00_inc.asm"
+.include "timer_def.asm"
 .include "vicky_def.asm"
 .include "interrupt_def.asm"
 .include "io_def.asm"
@@ -19,6 +20,8 @@
 .include "interrupt_handler.asm"
 
 TICK_COUNT      .byte 0
+MUSIC_TICK      .byte 0
+PATTERN_NUM     .byte 0
 LAST_KEY        .word 0
 BOARDX          .byte 0
 BOARDY          .byte 0
@@ -40,37 +43,34 @@ START_BOARD     = $5000 + $40 * 5 + (40-BOARD_WIDTH)/2
 START_BOARD_T   = $A000 + $900 + (72-BOARD_WIDTH)/2
 PIECE_VALUE     = $25  ; we're doing BCD additions
 LINE_VALUE      = 100
-MSG_ADDR        = $60
-DEL_LINE_PTR    = $60
-ROT_VAL         = $62
-ROT_VAL2        = $63
-LINE_CNTR       = $64
-COPY_LINE_PTR   = $66
-TOTAL_LINES     = $68
+MSG_ADDR        = $70
+DEL_LINE_PTR    = $70
+ROT_VAL         = $72
+ROT_VAL2        = $73
+LINE_CNTR       = $74
+COPY_LINE_PTR   = $76
+TOTAL_LINES     = $78
                 
 GAME_START      
                 setas
                 setxl
                 LDA #0
-                STA KEYBOARD_SC_FLG 
+                STA KEYBOARD_SC_FLG
+                STA MOUSE_PTR_CTRL_REG_L ; disable the mouse pointer
                 
                 setal
-                JSL INITSUPERIO
                 LDA #6
                 STA GABE_RNG_SEED_LO ; set the max value from 0 to 6
                 STA PIECE_X
-                JSL INITKEYBOARD
                 setas
                 JSR LOAD_GAME_ASSETS
                 
-                LDA #0
-                STA KEYBOARD_SC_FLG 
     NEXT_GAME
                 JSR INIT_GAME
                 JSL CLRSCREEN
                 
-                ; Enable SOF
-                LDA #~( FNX0_INT00_SOF )
+                ; Enable SOF and TIMER0
+                LDA #~( FNX0_INT00_SOF | FNX0_INT02_TMR0 )
                 STA @lINT_MASK_REG0
                 ; Enable Keyboard
                 LDA #~( FNX1_INT00_KBD )
@@ -79,6 +79,15 @@ GAME_START
                 ; enable Random Number Generation
                 LDA #1
                 STA GABE_RNG_CTRL
+                
+                ; load the intro music
+                setal
+                LDA #<>INTRO_MUSIC ; Set the Pointer where the File Begins
+                STA OPL2_ADDY_PTR_LO;
+                LDA #<`INTRO_MUSIC
+                STA OPL2_ADDY_PTR_HI;
+                setas
+                ;JSL RAD_INIT_PLAYER
                 
                 JSR PICK_NEXT_PIECE
                 CLI
@@ -895,6 +904,17 @@ GAME_OVER
                 LDA #1
                 STA GAME_STATE
                 
+                ; load the game over music
+                setal
+                LDA #<>GAME_OVER_MUSIC ; Set the Pointer where the File Begins
+                STA OPL2_ADDY_PTR_LO;
+                LDA #<`GAME_OVER_MUSIC
+                STA OPL2_ADDY_PTR_HI;
+                setas
+                JSL RAD_INIT_PLAYER
+                LDA #~(FNX0_INT02_TMR0)
+                STA @lINT_MASK_REG0
+                
                 ; set the display mode to tiles
                 LDA #Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
                 STA MASTER_CTRL_REG_L
@@ -1099,8 +1119,6 @@ LOAD_GAME_ASSETS
                 setas
                 PLB ; MVN operations set the bank - so we need to reset
                 
-                JSR LOAD_SONG
-                
                 ; enable tile layer 0
                 LDA #$83 ; we're using a 256 stride
                 STA TL0_CONTROL_REG
@@ -1161,15 +1179,22 @@ INIT_GAME
                 CPY #$800
                 BNE CLEAR_TS_LOOP
                 
+                setal
+                LDA #<>PLAY_MUSIC ; Set the Pointer where the File Begins
+                STA OPL2_ADDY_PTR_LO;
+                LDA #<`PLAY_MUSIC
+                STA OPL2_ADDY_PTR_HI;
+                setas
+                JSL RAD_INIT_PLAYER
+                
                 ; set the display mode to tiles
                 LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
                 STA MASTER_CTRL_REG_L
                 
                 RTS
-                
-LOAD_SONG       
-                .as
-                RTS
+
+.include "opl_library.asm"
+.include "rad_player.asm"
 
 ; *****************************************************************************
 ; * variables
@@ -1242,7 +1267,30 @@ BACKGROUND_PAL
 .binary "background.data.pal"
 PALETTE
 .binary "tetris-tiles.data.pal"
+INTRO_MUSIC
+.binary "adlibsp.rad"
+PLAY_MUSIC
+.binary "island industrial.rad"
+GAME_OVER_MUSIC
+.binary "sp2.rad"
+
+; this is a compromise - we should not have to copy the RAD into a pattern anymore
+PATTERN_BYTES = 1793
+LINE_BYTES    =   28
 * = $170000
+PATTERNS .for pattern=1, pattern <= 36, pattern += 1 ; 64548 bytes total
+    ; one pattern is 64 lines, each line is 9 channels - 1793 bytes per pattern
+    .byte pattern
+    .for line = 1, line <= 64, line += 1  ; 28 bytes per line
+        .byte line     ; line number
+        .rept 9
+            .byte 0, 0, 0 ; note/octave, instrument/effect, effect param
+        .next
+    .next
+.next
+ORDERS    .fill 120, 0
+INSTRUMENT_LIBRARY  .fill 240,0 ; each instrument is 12 bytes
+
+* = $180000
 BACKGROUND
 .binary "background.data"
-

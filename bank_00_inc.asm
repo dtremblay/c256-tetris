@@ -72,7 +72,7 @@ MIDI_DATA2      .byte 0
 TIMING_CNTR     .byte 0
 INSTR_ADDR      .fill 3,0
 INSTR_NUMBER    .byte $17, 0
-LINE_NUM_HEX    .byte 1
+LINE_NUM_HEX    .byte 0
 TAB_COUNTER     .byte 1
 REM_LINES       .byte 1
 DEC_MEM         .byte 1
@@ -94,7 +94,7 @@ MOUSE_POS_Y_HI   = $0000E4
 
 
 RAD_ADDR         = $0000F0 ; 3 bytes to avoid OPL2 errors.
-RAD_PATTRN       = $0000F3 ; 1 bytes - offset to patter
+RAD_PATTRN       = $0000F3 ; 1 bytes - offset to pattern
 RAD_PTN_DEST     = $0000F4 ; 3 bytes - where to write the pattern data
 RAD_CHANNEL      = $0000F7 ; 2 bytes - 0 to 8 
 RAD_LAST_NOTE    = $0000F9 ; 1 if this is the last note
