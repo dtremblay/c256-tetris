@@ -33,7 +33,12 @@ PIECE_FIT       .byte 0
 GAME_SPEED      .byte 0 ; how many ticks beteen bars falling
 PIECE_CNTR      .byte 0  ; we increase the speed of the game for every 10 pieces
 SCORE           .fill 4, 0  ; decimal formatted score
-GAME_STATE      .byte 0  ; 0 - running, 1 - game over, 2 - restarting, 3 - display line bonus
+GAME_STATE      .byte 4  ; 0 - running, 1 - game over, 2 - restarting, 3 - display line bonus, 4 - intro display
+GS_RUNNING      = 0
+GS_GAME_OVER    = 1
+GS_RESTARTING   = 2
+GS_LINE_BONUS   = 3
+GS_INTRO        = 4
 LEVEL           .byte 1
 
 INITIAL_GAME_SPEED = 40
@@ -64,9 +69,24 @@ GAME_START
                 STA PIECE_X
                 setas
                 JSR LOAD_GAME_ASSETS
+                LDA #GS_INTRO
+                STA GAME_STATE
+                
+                ; load the intro music
+                setal
+                LDA #<>INTRO_MUSIC ; Set the Pointer where the File Begins
+                STA OPL2_ADDY_PTR_LO;
+                LDA #<`INTRO_MUSIC
+                STA OPL2_ADDY_PTR_HI;
+                setas
+                JSL RAD_INIT_PLAYER
+                
+                JSR CLEAR_TILESET
+                ; set the display mode to tiles
+                LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
+                STA MASTER_CTRL_REG_L
                 
     NEXT_GAME
-                JSR INIT_GAME
                 JSL CLRSCREEN
                 
                 ; Enable SOF and TIMER0
@@ -80,15 +100,6 @@ GAME_START
                 LDA #1
                 STA GABE_RNG_CTRL
                 
-                ; load the intro music
-                setal
-                LDA #<>INTRO_MUSIC ; Set the Pointer where the File Begins
-                STA OPL2_ADDY_PTR_LO;
-                LDA #<`INTRO_MUSIC
-                STA OPL2_ADDY_PTR_HI;
-                setas
-                ;JSL RAD_INIT_PLAYER
-                
                 JSR PICK_NEXT_PIECE
                 CLI
                 
@@ -98,9 +109,16 @@ GAME_START
                 NOP
                 NOP
                 LDA GAME_STATE
-                CMP #2
-                BEQ NEXT_GAME
+                CMP #GS_RESTARTING
+                BNE IL_DONE
                 
+                LDA #GS_RUNNING
+                STA GAME_STATE
+                JSR INIT_GAME
+                
+                BRA NEXT_GAME
+        
+        IL_DONE
                 BRA INFINITE_LOOP
                 
 DISPLAY_BOARD_LOOP
@@ -471,10 +489,13 @@ MOVE_PIECE_DOWN
 ROTATE_PIECE
                 .as
                 LDA GAME_STATE
-                CMP #1 ; user pressed the space bar to restart the game
+                CMP #GS_GAME_OVER ; user pressed the space bar to restart the game
+                BEQ CHANGE_STATE
+    CHK_INTRO
+                CMP #GS_INTRO
                 BNE ROT_START
-                
-                LDA #2
+    CHANGE_STATE
+                LDA #GS_RESTARTING
                 STA GAME_STATE
                 RTS
                 
@@ -901,7 +922,7 @@ GAME_OVER
                 LDA #$FF
                 STA @lINT_MASK_REG0
                 
-                LDA #1
+                LDA #GS_GAME_OVER
                 STA GAME_STATE
                 
                 ; load the game over music
@@ -1140,7 +1161,6 @@ INIT_GAME
                 STA PIECE_Y
                 STA PIECE_FIT
                 STA TICK_COUNT
-                STA GAME_STATE
                 STA SCORE
                 STA SCORE + 1
                 STA SCORE + 2
@@ -1168,16 +1188,7 @@ INIT_GAME
                 STA @lINT_MASK_REG2
                 STA @lINT_MASK_REG3
                 
-                ; clear the tileset
-                LDX #$5000
-                STX CURSORPOS
-                LDA #0
-                LDY #0
-        CLEAR_TS_LOOP
-                STA [CURSORPOS],Y
-                INY
-                CPY #$800
-                BNE CLEAR_TS_LOOP
+                JSR CLEAR_TILESET
                 
                 setal
                 LDA #<>PLAY_MUSIC ; Set the Pointer where the File Begins
@@ -1193,6 +1204,53 @@ INIT_GAME
                 
                 RTS
 
+DISPLAY_INTRO
+                .as
+                
+                LDY #$A000 + 128*26 + 26
+                STY CURSORPOS
+                LDA #$2D
+                STA CURCOLOR
+                
+                LDY #<>INTRO_MSG
+                STY MSG_ADDR
+                JSR DISPLAY_MSG
+                
+                LDY #$A000 + 128*28 + 19
+                STY CURSORPOS
+                LDA #$2D
+                STA CURCOLOR
+                
+                LDY #<>MACHINE_DESIGNER_MSG
+                STY MSG_ADDR
+                JSR DISPLAY_MSG
+                
+                LDY #$A000 + 128*30 + 19
+                STY CURSORPOS
+                LDA #$2D
+                STA CURCOLOR
+                
+                LDY #<>SOFTWARE_DEV_MSG
+                STY MSG_ADDR
+                JSR DISPLAY_MSG
+                
+                
+                RTS
+                
+CLEAR_TILESET   
+                .as
+                ; clear the tileset
+                LDX #$5000
+                STX CURSORPOS
+                LDA #0
+                LDY #0
+        CLEAR_TS_LOOP
+                STA [CURSORPOS],Y
+                INY
+                CPY #$800
+                BNE CLEAR_TS_LOOP
+                RTS
+
 .include "opl_library.asm"
 .include "rad_player.asm"
 
@@ -1206,6 +1264,9 @@ SCORE_MSG       .text 'SCORE:',0
 LEVEL_MSG       .text 'LEVEL:',0
 BONUS_MSG       .text 'BONUS:  ',0
 LINES_MSG       .text 'LINES:  ',0
+INTRO_MSG       .text 'Welcome to C256 Tetris',0
+MACHINE_DESIGNER_MSG .text 'Hardware Designer: Stefany Allaire',0
+SOFTWARE_DEV_MSG     .text 'Software Developer: Daniel Tremblay',0
 BYTE_CNTR       .word 0
 PIECE0
     .byte 0,0,1,0
