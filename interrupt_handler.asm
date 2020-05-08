@@ -106,11 +106,44 @@ SOF_INTERRUPT
 
                 .as
                 LDA GAME_STATE  ; The SOF is still getting called, even when masked
-                BNE CHK_REMOVE_LINES 
+                BNE CHK_GAME_OVER 
                 JSR DISPLAY_BOARD_LOOP
                 BRA SOF_DONE
                 
+    CHK_GAME_OVER
+                CMP #GS_GAME_OVER
+                BNE CHK_REMOVE_LINES
+                
+                ; count 60 ticks for 1 second
+                LDA GAME_OVER_TICK
+                INC A
+                STA GAME_OVER_TICK
+                CMP #60
+                BNE SOF_DONE
+                
+                LDA #0
+                STA GAME_OVER_TICK
+                SED
+                LDA GAME_OVER_TIMER
+                SEC
+                SBC #1
+                STA GAME_OVER_TIMER
+                CLD
+                JSR DISPLAY_COUNTDOWN
+                
+                LDA GAME_OVER_TIMER
+                CMP #0
+                BNE SOF_DONE
+                
+                LDA #GS_INTRO
+                STA GAME_STATE
+                JSL CLRSCREEN
+                JSR DISPLAY_INTRO
+                
+                BRA SOF_DONE
+                
     CHK_REMOVE_LINES
+                
                 CMP #3
                 BNE CHK_INTRO_SCREEN
                 JSR REMOVE_LINES_LOOP
@@ -119,7 +152,7 @@ SOF_INTERRUPT
     CHK_INTRO_SCREEN
                 CMP #4
                 BNE SOF_DONE
-                JSR DISPLAY_INTRO
+                JSR INTRO_LOOP
     SOF_DONE
                 RTS
 

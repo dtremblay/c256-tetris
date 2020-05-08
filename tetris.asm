@@ -55,7 +55,10 @@ ROT_VAL2        = $73
 LINE_CNTR       = $74
 COPY_LINE_PTR   = $76
 TOTAL_LINES     = $78
-                
+GAME_OVER_TIMER = $80 ; 1 byte
+GAME_OVER_TICK  = $81 ; 1 byte
+INTRO_SLIDE_CNT = $82 ; 1 byte
+
 GAME_START      
                 setas
                 setxl
@@ -72,6 +75,8 @@ GAME_START
                 LDA #GS_INTRO
                 STA GAME_STATE
                 
+                JSR CLEAR_TILESET
+                
                 ; load the intro music
                 setal
                 LDA #<>INTRO_MUSIC ; Set the Pointer where the File Begins
@@ -81,13 +86,19 @@ GAME_START
                 setas
                 JSL RAD_INIT_PLAYER
                 
-                JSR CLEAR_TILESET
                 ; set the display mode to tiles
                 LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
                 STA MASTER_CTRL_REG_L
                 
     NEXT_GAME
                 JSL CLRSCREEN
+                LDA GAME_STATE
+                CMP #4
+                BNE SKIP_INTRO
+                
+                JSR DISPLAY_INTRO
+                
+        SKIP_INTRO
                 
                 ; Enable SOF and TIMER0
                 LDA #~( FNX0_INT00_SOF | FNX0_INT02_TMR0 )
@@ -918,12 +929,16 @@ DISPLAY_MSG
                 
 GAME_OVER
                 .as
-                ; stop the SOF interrupts
-                LDA #$FF
-                STA @lINT_MASK_REG0
                 
                 LDA #GS_GAME_OVER
                 STA GAME_STATE
+                LDA #0
+                STA GAME_OVER_TICK
+                LDA #$30
+                STA GAME_OVER_TIMER
+                
+                LDA #$82 ; we're using a 256 stride
+                STA TL0_CONTROL_REG
                 
                 ; load the game over music
                 setal
@@ -933,12 +948,6 @@ GAME_OVER
                 STA OPL2_ADDY_PTR_HI;
                 setas
                 JSL RAD_INIT_PLAYER
-                LDA #~(FNX0_INT02_TMR0)
-                STA @lINT_MASK_REG0
-                
-                ; set the display mode to tiles
-                LDA #Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
-                STA MASTER_CTRL_REG_L
                 
                 JSL CLRSCREEN
                 LDY #$A000 + 128*26 + 31
@@ -948,7 +957,6 @@ GAME_OVER
                 ; display GAME OVER
                 LDY #<>GAME_OVER_MSG
                 STY MSG_ADDR
-                
                 JSR DISPLAY_MSG
                 
                 ; display SCORE
@@ -968,6 +976,8 @@ GAME_OVER
                 JSR DISPLAY_HEX
                 LDA SCORE
                 JSR DISPLAY_HEX
+                
+                JSR DISPLAY_COUNTDOWN
                 
                 ; clear the board
                 LDA #0
@@ -999,6 +1009,23 @@ GAME_OVER
                 
                 RTS
                 
+DISPLAY_COUNTDOWN
+                .as
+                ; display RESTART
+                LDY #$A000 + 128*29 + 29
+                STY CURSORPOS
+                LDA #$20
+                STA CURCOLOR
+                
+                LDY #<>RESTART_MSG
+                STY MSG_ADDR
+                JSR DISPLAY_MSG
+                
+                ; the countdown timer is in BCD
+                LDA GAME_OVER_TIMER
+                JSR DISPLAY_HEX
+                
+                RTS
 DISPLAY_HEX
                 .as
                 PHA
@@ -1189,6 +1216,11 @@ INIT_GAME
                 STA @lINT_MASK_REG3
                 
                 JSR CLEAR_TILESET
+                LDA #$83 ; we're using a 256 stride
+                STA TL0_CONTROL_REG
+                
+                LDA #$82 ; we're using a 256 stride
+                STA TL1_CONTROL_REG
                 
                 setal
                 LDA #<>PLAY_MUSIC ; Set the Pointer where the File Begins
@@ -1204,37 +1236,55 @@ INIT_GAME
                 
                 RTS
 
-DISPLAY_INTRO
+INTRO_LOOP
                 .as
                 
-                LDY #$A000 + 128*26 + 26
+                RTS
+DISPLAY_INTRO
+                .as
+                PHB
+                
+                LDY #$A000 + 128*43 + 26
                 STY CURSORPOS
-                LDA #$2D
+                LDA #$70
                 STA CURCOLOR
                 
                 LDY #<>INTRO_MSG
                 STY MSG_ADDR
                 JSR DISPLAY_MSG
                 
-                LDY #$A000 + 128*28 + 19
+                LDY #$A000 + 128*45 + 19
                 STY CURSORPOS
-                LDA #$2D
+                LDA #$70
                 STA CURCOLOR
                 
                 LDY #<>MACHINE_DESIGNER_MSG
                 STY MSG_ADDR
                 JSR DISPLAY_MSG
                 
-                LDY #$A000 + 128*30 + 19
+                LDY #$A000 + 128*47 + 19
                 STY CURSORPOS
-                LDA #$2D
+                LDA #$70
                 STA CURCOLOR
                 
                 LDY #<>SOFTWARE_DEV_MSG
                 STY MSG_ADDR
                 JSR DISPLAY_MSG
                 
+                LDA #0
+                STA INTRO_SLIDE_CNT
                 
+                setal
+                LDA #$800
+                LDX #<>INTRO_TILESET
+                LDY #$5800
+                MVN `INTRO_TILESET,$AF
+                setas
+                
+                ; enable tile layer 1
+                LDA #$83 ; we're using a 256 stride
+                STA TL1_CONTROL_REG
+                PLB
                 RTS
                 
 CLEAR_TILESET   
@@ -1264,6 +1314,7 @@ SCORE_MSG       .text 'SCORE:',0
 LEVEL_MSG       .text 'LEVEL:',0
 BONUS_MSG       .text 'BONUS:  ',0
 LINES_MSG       .text 'LINES:  ',0
+RESTART_MSG     .text 'Restart in ',0
 INTRO_MSG       .text 'Welcome to C256 Tetris',0
 MACHINE_DESIGNER_MSG .text 'Hardware Designer: Stefany Allaire',0
 SOFTWARE_DEV_MSG     .text 'Software Developer: Daniel Tremblay',0
@@ -1334,6 +1385,8 @@ PLAY_MUSIC
 .binary "island industrial.rad"
 GAME_OVER_MUSIC
 .binary "sp2.rad"
+INTRO_TILESET
+.binary "title-tiles.data"
 
 ; this is a compromise - we should not have to copy the RAD into a pattern anymore
 PATTERN_BYTES = 1793
