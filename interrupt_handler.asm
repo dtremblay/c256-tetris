@@ -11,6 +11,7 @@ check_irq_bit  .macro
                 AND #\2
                 CMP #\2
                 BNE END_CHECK
+                AND #\2
                 STA \1
                 JSR \3
                 
@@ -33,12 +34,13 @@ IRQ_HANDLER
 ; Start of Frame (display), timer 0 (music), mouse (ignored)
                 check_irq_bit INT_PENDING_REG0, FNX0_INT00_SOF, SOF_INTERRUPT
                 check_irq_bit INT_PENDING_REG0, FNX0_INT02_TMR0, TIMER0_INTERRUPT
+                ;check_irq_bit INT_PENDING_REG0, FNX0_INT03_TMR1, TIMER1_INTERRUPT
                 check_irq_bit INT_PENDING_REG0, FNX0_INT07_MOUSE, MOUSE_INTERRUPT
-
 
 ; Second Block of 8 Interrupts
 CHECK_PENDING_REG1
                 setas
+                
                 LDA INT_PENDING_REG1
                 BEQ CHECK_PENDING_REG2   ; BEQ EXIT_IRQ_HANDLE
 ; Keyboard Interrupt
@@ -66,27 +68,27 @@ EXIT_IRQ_HANDLE
 ; * Alias ASD keys to arrows?
 KEYBOARD_INTERRUPT
                 .as
-                LDA #0  ; clear B
-                XBA
                 
+                setxs
                 LDA KBD_INPT_BUF        ; Get Scan Code from KeyBoard
-                STA KEYBOARD_SC_TMP     ; Save Code Immediately
+                CMP KEYBOARD_SC_TMP     ; don't accept auto-repeat
+                BEQ DONT_REACT
                 
+                STA KEYBOARD_SC_TMP     ; Save Code Immediately
                 TAX
                 LDA ScanCode_Press_Set1,X
-                STA LAST_KEY
-                
-                LDA #0
-                XBA
-                LDA LAST_KEY
                 TAX
+                CPX #0
                 BEQ DONT_REACT
                 LDA GAME_STATE
                 CMP #GS_LINE_BONUS
                 BEQ DONT_REACT
                 
+                setxl
                 JSR (KEY_JUMP_TABLE,X)
     DONT_REACT
+                setxl
+                LDA KBD_INPT_BUF
                 RTS
                 
 KEY_JUMP_TABLE
@@ -159,38 +161,12 @@ SOF_INTERRUPT
 
 ; ****************************************************************
 ; ****************************************************************
-; * Play notes
+; * Play VGM files
 ; ****************************************************************
 ; ****************************************************************
 TIMER0_INTERRUPT
                 .as
-                
-                LDA @lMUSIC_TICK
-                BNE INCR_MUSIC_TICK
-                
-                JSR RAD_PLAYNOTES
-                
-    INCR_MUSIC_TICK
-                LDA @lMUSIC_TICK
-                INC A
-                STA @lMUSIC_TICK
-                CMP @lTuneInfo.InitialSpeed
-                BNE TIMER0_DONE
-                
-                ; increment the line
-                LDA LINE_NUM_HEX
-                INC A
-                STA LINE_NUM_HEX
-                CMP #64 ; patterns have 64 lines
-                BNE INCR_DONE
-                
-                STZ LINE_NUM_HEX
-                JSR INCREMENT_ORDER
-    INCR_DONE
-                LDA #0
-                STA @lMUSIC_TICK
-    TIMER0_DONE
-                
+                JSR VGM_WRITE_REGISTER
                 RTS
                 
 ; ****************************************************************

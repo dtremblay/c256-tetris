@@ -1,6 +1,12 @@
 ; *************************************************************************
 ; * Lame attempt at a copy-cat game like Tetris
-; * Work under progress!
+; * Author Daniel Tremblay
+; * Code written for the C256 Foenix retro computer
+; * Permission is granted to reuse this code to create your own games
+; * for the C256 Foenix.
+; * Copyright Daniel Tremblay 2020
+; * This code is provided without warranty.
+; * Please attribute credits to Daniel Tremblay is you reuse.
 ; *************************************************************************
 .cpu "65816"
 .include "macros_inc.asm"
@@ -20,13 +26,10 @@
 .include "interrupt_handler.asm"
 
 TICK_COUNT      .byte 0
-MUSIC_TICK      .byte 0
-PATTERN_NUM     .byte 0
-LAST_KEY        .word 0
 BOARDX          .byte 0
 BOARDY          .byte 0
 CURRENT_PIECE   .byte 0
-PIECE_X         .word 6
+PIECE_X         .word 5
 PIECE_Y         .word 0
 PIECE_ROT       .byte 0
 PIECE_FIT       .byte 0
@@ -59,6 +62,17 @@ GAME_OVER_TIMER = $80 ; 1 byte
 GAME_OVER_TICK  = $81 ; 1 byte
 INTRO_SLIDE_CNT = $82 ; 1 byte
 
+OPM_BASE_ADDRESS  = $AFF000
+PSG_BASE_ADDRESS  = $AFF100
+OPN2_BASE_ADDRESS = $AFF200
+OPL3_BASE_ADRESS  = $AFE600
+
+; VGM Registers
+SONG_START        = $84 ; 4 bytes
+CURRENT_POSITION  = $88 ; 4 bytes
+WAIT_CNTR         = $8C ; 2 bytes
+LOOP_OFFSET_REG   = $8E ; 2 bytes
+
 GAME_START      
                 setas
                 setxl
@@ -67,7 +81,7 @@ GAME_START
                 STA MOUSE_PTR_CTRL_REG_L ; disable the mouse pointer
                 
                 setal
-                LDA #6
+                LDA #5
                 STA GABE_RNG_SEED_LO ; set the max value from 0 to 6
                 STA PIECE_X
                 setas
@@ -77,14 +91,7 @@ GAME_START
                 
                 JSR CLEAR_TILESET
                 
-                ; load the intro music
-                setal
-                LDA #<>INTRO_MUSIC ; Set the Pointer where the File Begins
-                STA OPL2_ADDY_PTR_LO;
-                LDA #<`INTRO_MUSIC
-                STA OPL2_ADDY_PTR_HI;
-                setas
-                JSL RAD_INIT_PLAYER
+                JSR VGM_INIT_TIMER0
                 
                 ; set the display mode to tiles
                 LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
@@ -99,7 +106,6 @@ GAME_START
                 JSR DISPLAY_INTRO
                 
         SKIP_INTRO
-                
                 ; Enable SOF and TIMER0
                 LDA #~( FNX0_INT00_SOF | FNX0_INT02_TMR0 )
                 STA @lINT_MASK_REG0
@@ -178,7 +184,7 @@ DISPLAY_BOARD_LOOP
                 JSR LOOK_FOR_LINES
                 
                 ; choose another piece and set it at the top
-                LDA #6
+                LDA #5
                 STA PIECE_X
                 LDA #0
                 STA PIECE_Y
@@ -941,13 +947,14 @@ GAME_OVER
                 STA TL0_CONTROL_REG
                 
                 ; load the game over music
+                LDA #`VGM_GAME_OVER_MUSIC
+                STA CURRENT_POSITION + 2
+                STA SONG_START + 2
                 setal
-                LDA #<>GAME_OVER_MUSIC ; Set the Pointer where the File Begins
-                STA OPL2_ADDY_PTR_LO;
-                LDA #<`GAME_OVER_MUSIC
-                STA OPL2_ADDY_PTR_HI;
+                LDA #<>VGM_GAME_OVER_MUSIC
+                STA SONG_START
                 setas
-                JSL RAD_INIT_PLAYER
+                JSR VGM_SET_SONG_POINTERS
                 
                 JSL CLRSCREEN
                 LDY #$A000 + 128*26 + 31
@@ -1071,7 +1078,7 @@ DELETE_LINES
                 STA BYTE_CNTR
                 
                 TAX
-        CHECK_NEXT
+        DL_CHECK_NEXT
                 INX
                 INX
                 
@@ -1094,7 +1101,7 @@ DELETE_LINES
                 LDA LINE_CNTR
                 DEC A
                 STA LINE_CNTR
-                BNE CHECK_NEXT
+                BNE DL_CHECK_NEXT
                 
                 BRA DELETE_LINES_DONE
                 
@@ -1208,7 +1215,7 @@ INIT_GAME
                 STA @lINT_EDGE_REG2
                 STA @lINT_EDGE_REG3
                 
-                ; Mask all Interrupt @ This Point
+                ; ; Mask all Interrupt @ This Point
                 LDA #$FF
                 STA @lINT_MASK_REG0
                 STA @lINT_MASK_REG1
@@ -1222,13 +1229,15 @@ INIT_GAME
                 LDA #$82 ; we're using a 256 stride
                 STA TL1_CONTROL_REG
                 
+                ; load the play music
+                LDA #`VGM_PLAY_MUSIC
+                STA CURRENT_POSITION + 2
+                STA SONG_START + 2
                 setal
-                LDA #<>PLAY_MUSIC ; Set the Pointer where the File Begins
-                STA OPL2_ADDY_PTR_LO;
-                LDA #<`PLAY_MUSIC
-                STA OPL2_ADDY_PTR_HI;
+                LDA #<>VGM_PLAY_MUSIC
+                STA SONG_START
                 setas
-                JSL RAD_INIT_PLAYER
+                JSR VGM_SET_SONG_POINTERS
                 
                 ; set the display mode to tiles
                 LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
@@ -1238,11 +1247,56 @@ INIT_GAME
 
 INTRO_LOOP
                 .as
+                PHB
+                LDA TICK_COUNT
+                INC A
+                STA TICK_COUNT
+                CMP #20
+                BNE INTRO_LOOP_DONE 
+                LDA #0
+                STA TICK_COUNT
                 
+                LDX #0
+                LDA INTRO_SLIDE_CNT
+                INC A
+                STA INTRO_SLIDE_CNT
+                
+                LDA #$AF
+                PHA
+                PLB
+                LDX #0
+        IL_NEXT_TILE
+                INX
+                LDA $5800,X
+                CPX #$5C0
+                BEQ INTRO_LOOP_DONE
+                CMP #0
+                BEQ IL_NEXT_TILE
+                
+                INC A
+                STA $5800,X
+                CMP #$9
+                BNE IL_NEXT_TILE
+                LDA #2
+                STA $5800,X
+                BNE IL_NEXT_TILE
+                
+    INTRO_LOOP_DONE
+                PLB
                 RTS
 DISPLAY_INTRO
                 .as
                 PHB
+                
+                ; load the intro music
+                LDA #`VGM_INTRO_MUSIC
+                STA CURRENT_POSITION + 2
+                STA SONG_START + 2
+                setal
+                LDA #<>VGM_INTRO_MUSIC
+                STA SONG_START
+                setas
+                JSR VGM_SET_SONG_POINTERS
                 
                 LDY #$A000 + 128*43 + 26
                 STY CURSORPOS
@@ -1301,8 +1355,8 @@ CLEAR_TILESET
                 BNE CLEAR_TS_LOOP
                 RTS
 
-.include "opl_library.asm"
-.include "rad_player.asm"
+;.include "opl_library.asm"
+.include "vgm_player.asm"
 
 ; *****************************************************************************
 ; * variables
@@ -1379,32 +1433,17 @@ BACKGROUND_PAL
 .binary "background.data.pal"
 PALETTE
 .binary "tetris-tiles.data.pal"
-INTRO_MUSIC
-.binary "adlibsp.rad"
-PLAY_MUSIC
-.binary "island industrial.rad"
-GAME_OVER_MUSIC
-.binary "sp2.rad"
+
+VGM_INTRO_MUSIC
+.binary "music/02 Strolling Player.vgm"
+VGM_PLAY_MUSIC
+.binary "music/05 Troika.vgm"
+VGM_GAME_OVER_MUSIC
+.binary "music/04 Kalinka.vgm"
+
 INTRO_TILESET
 .binary "title-tiles.data"
 
-; this is a compromise - we should not have to copy the RAD into a pattern anymore
-PATTERN_BYTES = 1793
-LINE_BYTES    =   28
 * = $170000
-PATTERNS .for pattern=1, pattern <= 36, pattern += 1 ; 64548 bytes total
-    ; one pattern is 64 lines, each line is 9 channels - 1793 bytes per pattern
-    .byte pattern
-    .for line = 1, line <= 64, line += 1  ; 28 bytes per line
-        .byte line     ; line number
-        .rept 9
-            .byte 0, 0, 0 ; note/octave, instrument/effect, effect param
-        .next
-    .next
-.next
-ORDERS    .fill 120, 0
-INSTRUMENT_LIBRARY  .fill 240,0 ; each instrument is 12 bytes
-
-* = $180000
 BACKGROUND
 .binary "background.data"
