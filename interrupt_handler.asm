@@ -11,7 +11,6 @@ check_irq_bit  .macro
                 AND #\2
                 CMP #\2
                 BNE END_CHECK
-                AND #\2
                 STA \1
                 JSR \3
                 
@@ -28,6 +27,7 @@ IRQ_HANDLER
                 PHA
                 PLB
                 setas
+
                 LDA INT_PENDING_REG0
                 BEQ CHECK_PENDING_REG1
 
@@ -53,8 +53,7 @@ CHECK_PENDING_REG2
                 BEQ EXIT_IRQ_HANDLE
                 
 EXIT_IRQ_HANDLE
-                ; Exit Interrupt Handler
-
+                
                 RTL
 
 ; ****************************************************************
@@ -70,11 +69,12 @@ KEYBOARD_INTERRUPT
                 .as
                 
                 setxs
+    MORE_KEYS
                 LDA KBD_INPT_BUF        ; Get Scan Code from KeyBoard
-                CMP KEYBOARD_SC_TMP     ; don't accept auto-repeat
-                BEQ DONT_REACT
+                ;CMP KEYBOARD_SC_TMP     ; don't accept auto-repeat
+                ;BEQ DONT_REACT
                 
-                STA KEYBOARD_SC_TMP     ; Save Code Immediately
+                ;STA KEYBOARD_SC_TMP     ; Save Code Immediately
                 TAX
                 LDA ScanCode_Press_Set1,X
                 TAX
@@ -88,7 +88,7 @@ KEYBOARD_INTERRUPT
                 JSR (KEY_JUMP_TABLE,X)
     DONT_REACT
                 setxl
-                LDA KBD_INPT_BUF
+
                 RTS
                 
 KEY_JUMP_TABLE
@@ -105,8 +105,18 @@ KEY_JUMP_TABLE
 ; ****************************************************************
 ; ****************************************************************
 SOF_INTERRUPT
-
                 .as
+                ; empty the keyboard buffer, just in case
+        EMPTY_KBD_BUFFER
+                LDA @lSTATUS_PORT
+                BIT #1
+                BEQ GS_KBD_NOT_FULL
+                LDA KBD_INPT_BUF
+                BRA EMPTY_KBD_BUFFER
+        GS_KBD_NOT_FULL
+                
+                JSR HANDLE_JOYSTICK
+                
                 LDA GAME_STATE  ; The SOF is still getting called, even when masked
                 BNE CHK_GAME_OVER 
                 JSR DISPLAY_BOARD_LOOP

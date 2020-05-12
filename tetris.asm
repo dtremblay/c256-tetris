@@ -79,6 +79,7 @@ GAME_START
                 LDA #0
                 STA KEYBOARD_SC_FLG
                 STA MOUSE_PTR_CTRL_REG_L ; disable the mouse pointer
+                STA VKY_TXT_CURSOR_CTRL_REG ; disable the cursor
                 
                 setal
                 LDA #5
@@ -173,14 +174,15 @@ DISPLAY_BOARD_LOOP
                 LDA SCORE
                 ADC #PIECE_VALUE
                 STA SCORE
-                CLD
-                setas
-                BCC NG_CONTINUE
+                BCC NG_CONTINUE ; carry
                 ; increment the hi-byte
+                CLC
                 LDA SCORE+2
-                INC A
+                ADC #1
                 STA SCORE+2
         NG_CONTINUE
+                CLD
+                setas
                 JSR LOOK_FOR_LINES
                 
                 ; choose another piece and set it at the top
@@ -884,7 +886,14 @@ REMOVE_LINES_LOOP
                 CLC 
                 ADC SCORE
                 STA SCORE
+                BCC CB_CONTINUE ; carry
                 
+                ; increment the hi-byte
+                CLC
+                LDA SCORE+2
+                ADC #1
+                STA SCORE+2
+        CB_CONTINUE
                 ; calculate the number of total lines
                 LDA LINE_CNTR
                 CLC
@@ -1353,6 +1362,16 @@ CLEAR_TILESET
                 INY
                 CPY #$800
                 BNE CLEAR_TS_LOOP
+                RTS
+                
+HANDLE_JOYSTICK
+                .as
+                LDA JOYSTICK0
+                BIT #1 ; up
+                BIT #2 ; down
+                BIT #4 ; left
+                BIT #8 ; right
+                BIT #$10 ; button
                 RTS
 
 ;.include "opl_library.asm"

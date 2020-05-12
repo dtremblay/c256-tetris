@@ -95,6 +95,23 @@ VGM_WRITE_REGISTER
             INY
             BRA VGM_CHECK_NEXT
         
+        CHK_YM_3812
+            CMP #$5A
+            BNE CHK_YM262_P0
+            
+            ; the second byte is the register
+            LDA #0
+            XBA
+            LDA [SONG_START],Y
+            TAX
+            INY
+            
+            ; the third byte is the value to write in the register
+            LDA [SONG_START],Y
+            STA @lOPL3_BASE_ADRESS,X
+            INY
+            BRA VGM_CHECK_NEXT
+        
         CHK_YM262_P0
             CMP #$5E
             BNE CHK_YM262_P1
@@ -164,7 +181,7 @@ VGM_WRITE_REGISTER
             CMP #$66 ; end of song
             BNE CHK_DATA_BLOCK
             
-            JSR SET_LOOP_POINTERS
+            JSR VGM_SET_LOOP_POINTERS
             ;PLB
             RTS
             
@@ -235,7 +252,7 @@ VGM_SET_SONG_POINTERS
             
             RTS
             
-SET_LOOP_POINTERS
+VGM_SET_LOOP_POINTERS
             .as
             
             ; add the start offset
