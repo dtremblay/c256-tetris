@@ -29,6 +29,7 @@ TICK_COUNT      .byte 0
 BOARDX          .byte 0
 BOARDY          .byte 0
 CURRENT_PIECE   .byte 0
+NEXT_PIECE      .byte 0
 PIECE_X         .word 5
 PIECE_Y         .word 0
 PIECE_ROT       .byte 0
@@ -48,7 +49,7 @@ INITIAL_GAME_SPEED = 40
 BOARD_WIDTH     = 14
 BOARD_HEIGHT    = 21
 START_BOARD     = $5000 + $40 * 5 + (40-BOARD_WIDTH)/2
-START_BOARD_T   = $A000 + $900 + (72-BOARD_WIDTH)/2
+NEXT_PIECE_LOC  = $5000 + $40 *11 + 31
 PIECE_VALUE     = $25  ; we're doing BCD additions
 LINE_VALUE      = 100
 MSG_ADDR        = $70
@@ -98,15 +99,13 @@ GAME_START
                 LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
                 STA MASTER_CTRL_REG_L
                 
+                
+                ; enable Random Number Generation
+                LDA #1
+                STA GABE_RNG_CTRL
+                CLI
+                
     NEXT_GAME
-                JSL CLRSCREEN
-                LDA GAME_STATE
-                CMP #4
-                BNE SKIP_INTRO
-                
-                JSR DISPLAY_INTRO
-                
-        SKIP_INTRO
                 ; Enable SOF and TIMER0
                 LDA #~( FNX0_INT00_SOF | FNX0_INT02_TMR0 )
                 STA @lINT_MASK_REG0
@@ -114,12 +113,25 @@ GAME_START
                 LDA #~( FNX1_INT00_KBD )
                 STA @lINT_MASK_REG1
                 
-                ; enable Random Number Generation
-                LDA #1
-                STA GABE_RNG_CTRL
+                JSL CLRSCREEN
+                LDA GAME_STATE
+                CMP #4
+                BNE SKIP_INTRO
+                
+                JSR DISPLAY_INTRO
+                BRA INFINITE_LOOP
+                
+        SKIP_INTRO
+                
+        RANDOM_TRY_AGAIN
+                LDA GABE_RNG_DAT_LO
+                AND #7
+                STA CURRENT_PIECE
+                CMP #7
+                BEQ RANDOM_TRY_AGAIN
                 
                 JSR PICK_NEXT_PIECE
-                CLI
+                JSR DRAW_NEXT_PIECE
                 
                 ; wait for interrupts
     INFINITE_LOOP
@@ -195,6 +207,9 @@ DISPLAY_BOARD_LOOP
                 STA TICK_COUNT
                 
                 JSR PICK_NEXT_PIECE
+                ; draw the next piece
+                JSR DRAW_NEXT_PIECE
+                
                 LDA PIECE_CNTR
                 INC A
                 STA PIECE_CNTR
@@ -228,11 +243,15 @@ DISPLAY_BOARD_LOOP
                 
 PICK_NEXT_PIECE
                 .as
+                LDA NEXT_PIECE
+                STA CURRENT_PIECE
+                
+    PN_TRY_AGAIN
                 LDA GABE_RNG_DAT_LO
                 AND #7
-                STA CURRENT_PIECE
+                STA NEXT_PIECE
                 CMP #7
-                BEQ PICK_NEXT_PIECE
+                BEQ PN_TRY_AGAIN
                 RTS
 
 DISPLAY_SYMBOL
@@ -510,12 +529,13 @@ ROTATE_PIECE
                 LDA GAME_STATE
                 CMP #GS_GAME_OVER ; user pressed the space bar to restart the game
                 BEQ CHANGE_STATE
-    CHK_INTRO
+
                 CMP #GS_INTRO
                 BNE ROT_START
     CHANGE_STATE
                 LDA #GS_RESTARTING
                 STA GAME_STATE
+                
                 RTS
                 
     ROT_START
@@ -736,18 +756,18 @@ DRAW_PIECE
                 LDA #0
                 XBA
                 
-                LDA CURRENT_PIECE
+                LDA CURRENT_PIECE ; each piece is 16 bytes
                 ASL A
                 ASL A
                 ASL A
                 ASL A
                 TAX
-        NEXT_PIECE_SYMBOL
+        DP_NEXT_PIECE_SYMBOL
                 JSR GET_PIECE_VALUE
                 CMP #0
                 BEQ SKIP_DRAW
                 
-                LDA CURRENT_PIECE
+                LDA CURRENT_PIECE ; skip first two tiles
                 CLC
                 ADC #2
                 STA [CURSORPOS]
@@ -757,7 +777,7 @@ DRAW_PIECE
                 INC CURSORPOS
                 TXA
                 AND #3
-                BNE NEXT_PIECE_SYMBOL
+                BNE DP_NEXT_PIECE_SYMBOL
                 
                 setal
                 LDA CURSORPOS
@@ -767,13 +787,66 @@ DRAW_PIECE
                 TXA
                 AND #$F
                 setas
-                BNE NEXT_PIECE_SYMBOL
+                BNE DP_NEXT_PIECE_SYMBOL
+                
+                RTS
+                
+DRAW_NEXT_PIECE
+                .as
+                LDY #$A000 + $80 * 16 + 56
+                STY CURSORPOS
+                LDA #$20
+                STA CURCOLOR
+                
+                LDY #<>NEXT_TILE_MSG
+                STY MSG_ADDR
+                JSR DISPLAY_MSG
+                
+                LDX #NEXT_PIECE_LOC
+                STX CURSORPOS
+                
+                LDA #0
+                XBA
+                
+                LDA NEXT_PIECE ; each piece is 16 bytes
+                ASL A
+                ASL A
+                ASL A
+                ASL A
+                TAX
+        DNP_NEXT_PIECE_SYMBOL
+                LDA PIECE0,X
+                CMP #0
+                BEQ DRAW_BLANK
+                
+                LDA NEXT_PIECE ; skip fist two tiles
+                CLC
+                ADC #2
+                
+        DRAW_BLANK
+                STA [CURSORPOS]
+                
+                INX
+                INC CURSORPOS
+                TXA
+                AND #3
+                BNE DNP_NEXT_PIECE_SYMBOL
+                
+                setal
+                LDA CURSORPOS
+                CLC
+                ADC #$40-4
+                STA CURSORPOS
+                TXA
+                AND #$F
+                setas
+                BNE DNP_NEXT_PIECE_SYMBOL
                 
                 RTS
                 
 DRAW_SCORE
                 .as
-                LDY #$A000 + 128*5 + 56
+                LDY #$A000 + $80 * 5 + 56
                 STY CURSORPOS
                 LDA #$20
                 STA CURCOLOR
@@ -794,7 +867,7 @@ DRAW_SCORE
                 
 DRAW_LEVEL
                 .as
-                LDY #$A000 + 128*7 + 56
+                LDY #$A000 + $80 * 7 + 56
                 STY CURSORPOS
                 LDA #$20
                 STA CURCOLOR
@@ -814,7 +887,7 @@ DRAW_LEVEL
                 
 DRAW_LINES
                 .as
-                LDY #$A000 + 128*13 + 56
+                LDY #$A000 + $80 * 13 + 56
                 STY CURSORPOS
                 LDA #$20
                 STA CURCOLOR
@@ -844,7 +917,7 @@ REMOVE_LINES_LOOP
                 BNE WAIT_FOR_50
                 
                 ; display bonus message
-                LDY #$A000 + 128*11 + 56
+                LDY #$A000 + $80 * 11 + 56
                 STY CURSORPOS
                 LDA #$20
                 STA CURCOLOR
@@ -866,7 +939,7 @@ REMOVE_LINES_LOOP
                 BNE SKIP_DELETE_LINES
                 
                 ; delete the bonus line
-                LDY #$A000 + 128*11 + 56
+                LDY #$A000 + $80 * 11 + 56
                 STY CURSORPOS
                 LDA #0
                 LDY #0
@@ -1387,6 +1460,7 @@ SCORE_MSG       .text 'SCORE:',0
 LEVEL_MSG       .text 'LEVEL:',0
 BONUS_MSG       .text 'BONUS:  ',0
 LINES_MSG       .text 'LINES:  ',0
+NEXT_TILE_MSG   .text 'NEXT TILE:',0
 RESTART_MSG     .text 'Restart in ',0
 INTRO_MSG       .text 'Welcome to C256 Tetris',0
 MACHINE_DESIGNER_MSG .text 'Hardware Designer: Stefany Allaire',0
