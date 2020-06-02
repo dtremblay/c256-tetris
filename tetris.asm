@@ -99,13 +99,13 @@ GAME_START
                 LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
                 STA MASTER_CTRL_REG_L
                 
-                
                 ; enable Random Number Generation
                 LDA #1
                 STA GABE_RNG_CTRL
-                CLI
                 
     NEXT_GAME
+                JSL CLRSCREEN
+                
                 ; Enable SOF and TIMER0
                 LDA #~( FNX0_INT00_SOF | FNX0_INT02_TMR0 )
                 STA @lINT_MASK_REG0
@@ -113,25 +113,27 @@ GAME_START
                 LDA #~( FNX1_INT00_KBD )
                 STA @lINT_MASK_REG1
                 
-                JSL CLRSCREEN
                 LDA GAME_STATE
-                CMP #4
+                CMP #GS_INTRO
                 BNE SKIP_INTRO
                 
                 JSR DISPLAY_INTRO
+                CLI
                 BRA INFINITE_LOOP
                 
         SKIP_INTRO
-                
-        RANDOM_TRY_AGAIN
+                SEI
+            RANDOM_TRY_AGAIN
                 LDA GABE_RNG_DAT_LO
                 AND #7
-                STA CURRENT_PIECE
+                STA NEXT_PIECE
                 CMP #7
                 BEQ RANDOM_TRY_AGAIN
                 
                 JSR PICK_NEXT_PIECE
+                
                 JSR DRAW_NEXT_PIECE
+                CLI
                 
                 ; wait for interrupts
     INFINITE_LOOP
@@ -1460,7 +1462,7 @@ SCORE_MSG       .text 'SCORE:',0
 LEVEL_MSG       .text 'LEVEL:',0
 BONUS_MSG       .text 'BONUS:  ',0
 LINES_MSG       .text 'LINES:  ',0
-NEXT_TILE_MSG   .text 'NEXT TILE:',0
+NEXT_TILE_MSG   .text 'NEXT PIECE:',0
 RESTART_MSG     .text 'Restart in ',0
 INTRO_MSG       .text 'Welcome to C256 Tetris',0
 MACHINE_DESIGNER_MSG .text 'Hardware Designer: Stefany Allaire',0
