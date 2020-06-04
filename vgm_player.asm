@@ -13,7 +13,7 @@
 ; *   In the TIMER0 interrupt handler, call the VGM_WRITE_REGISTER subroutine.
 ; *   In your game code, set the SONG_START to the beginning of your VGM file.
 ; *   Call VGM_SET_SONG_POINTERS, this will initialize the other register.
-; *   Finally, call VGM_INIT_TIMER0 to initialize TIMER0.
+; *   Finally, call VGM_INIT_TIMERS to initialize TIMER0 and TIMER1.
 ; *   Chips supported at this time are:
 ; *     - SN76489 (PSG)
 ; *     - YM2612 (OPN2)
@@ -42,6 +42,7 @@ AY_3_8910_N       = $96 ; 2 bytes
 
 DATA_STREAM_CNT   = $7D ; 2 byte
 DATA_STREAM_TBL   = $8000 ; each entry is 4 bytes
+
 increment_long_addr .macro
             setal
             INC \1
@@ -822,26 +823,34 @@ VGM_SET_LOOP_POINTERS
             RTS
 
             
-VGM_INIT_TIMER0
+VGM_INIT_TIMERS
             .as
             
             LDA #64
             STA TIMER0_CMP_L
+            STA TIMER1_CMP_L
             LDA #1
             STA TIMER0_CMP_M
+            STA TIMER1_CMP_M
             LDA #0
             STA TIMER0_CMP_H
+            STA TIMER1_CMP_H
             
             LDA #0    ; set timer0 charge to 0
             STA TIMER0_CHARGE_L
             STA TIMER0_CHARGE_M
             STA TIMER0_CHARGE_H
+            STA TIMER1_CHARGE_L
+            STA TIMER1_CHARGE_M
+            STA TIMER1_CHARGE_H
             
             LDA #TMR0_CMP_RECLR  ; count up from "CHARGE" value to TIMER_CMP
             STA TIMER0_CMP_REG
+            STA TIMER1_CMP_REG
             
             LDA #(TMR0_EN | TMR0_UPDWN | TMR0_SCLR)
             STA TIMER0_CTRL_REG
+            STA TIMER1_CTRL_REG
 
             RTS
             

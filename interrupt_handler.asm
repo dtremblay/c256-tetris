@@ -34,7 +34,7 @@ IRQ_HANDLER
 ; Start of Frame (display), timer 0 (music), mouse (ignored)
                 check_irq_bit INT_PENDING_REG0, FNX0_INT00_SOF, SOF_INTERRUPT
                 check_irq_bit INT_PENDING_REG0, FNX0_INT02_TMR0, TIMER0_INTERRUPT
-                ;check_irq_bit INT_PENDING_REG0, FNX0_INT03_TMR1, TIMER1_INTERRUPT
+                check_irq_bit INT_PENDING_REG0, FNX0_INT03_TMR1, TIMER1_INTERRUPT
                 check_irq_bit INT_PENDING_REG0, FNX0_INT07_MOUSE, MOUSE_INTERRUPT
 
 ; Second Block of 8 Interrupts
@@ -177,6 +177,30 @@ SOF_INTERRUPT
 TIMER0_INTERRUPT
                 .as
                 JSR VGM_WRITE_REGISTER
+                RTS
+                
+TIMER1_INTERRUPT
+                .as
+                LDA EFFECT_PLAY
+                BEQ NO_EFFECT
+                
+                BIT #TILE_EFFECT
+                BEQ CHK_LINE_EFFECT
+                JSR PLAY_T_EFFECT
+                
+        CHK_LINE_EFFECT
+                LDA EFFECT_PLAY
+                BIT #LINE_EFFECT
+                BEQ CHK_ROTATE_EFFECT
+                JSR PLAY_L_EFFECT
+                
+        CHK_ROTATE_EFFECT
+                LDA EFFECT_PLAY
+                BIT #ROTATE_EFFECT
+                BEQ NO_EFFECT
+                JSR PLAY_R_EFFECT
+                
+    NO_EFFECT
                 RTS
                 
 ; ****************************************************************

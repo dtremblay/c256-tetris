@@ -20,23 +20,6 @@ COLORPOS         = $00001F ;3 Byte address of cursor's position in the color mat
 STACKBOT         = $000022 ;2 Bytes Lowest location the stack should be allowed to write to. If SP falls below this value, the runtime should generate STACK OVERFLOW error and abort.
 STACKTOP         = $000024 ;2 Bytes Highest location the stack can occupy. If SP goes above this value, the runtime should generate STACK OVERFLOW error and abort.
 
-; OPL2 Library Variable (Can be shared if Library is not used)
-; This will need to move eventually
-OPL2_OPERATOR    = $000026 ;
-OPL2_CHANNEL     = $000027 ;
-OPL2_REG_REGION  = $000028 ; Offset to the Group of Registers
-OPL2_REG_OFFSET  = $00002A ; 2 Bytes (16Bits)
-OPL2_IND_ADDY_LL = $00002C ; 2 Bytes Reserved (Only need 3)
-OPL2_IND_ADDY_HL = $00002E ; 2 Bytes Reserved (Only need 3)
-OPL2_NOTE        = $000030 ; 1 Byte
-OPL2_OCTAVE      = $000031 ; 1 Byte
-OPL2_PARAMETER0  = $000032 ; 1 Byte - Key On/Feedback
-OPL2_PARAMETER1  = $000033 ; 1 Byte
-OPL2_PARAMETER2  = $000034 ; 1 Byte
-OPL2_PARAMETER3  = $000035 ; 1 Byte
-OPL2_LOOP        = $000036 ;
-OPL2_BLOCK       = $000036 ;
-
 ; SD Card (CH376S) Variables
 SDCARD_FILE_PTR  = $000038 ; 3 Bytes Pointer to Filename to open
 SDCARD_BYTE_NUM  = $00003C ; 2 Bytes
@@ -60,26 +43,6 @@ SDOS_FILE_REC_PTR= $000051 ; 3 byte pointer to a simple file struct
 SDOS_LOOP        = $000054 ; variable to count file length
 SDOS_FILE_SIZE   = $000055 ; 4 bytes for the file length
 
-;Empty Region
-;XXX             = $000060
-; * = $60
-; MIDI_COUNTER    .byte 0
-; MIDI_REG        .byte 0
-; MIDI_CTRL       .byte 0
-; MIDI_CHANNEL    .byte 0
-; MIDI_DATA1      .byte 0
-; MIDI_DATA2      .byte 0
-; TIMING_CNTR     .byte 0
-; INSTR_ADDR      .fill 3,0
-; INSTR_NUMBER    .byte $17, 0
-; LINE_NUM_HEX    .byte 0
-; TAB_COUNTER     .byte 1
-; REM_LINES       .byte 1
-; DEC_MEM         .byte 1
-; PTRN_ADDR       .long 0
-; LINE_ADDR       .long 0
-; CONV_VAL        .byte 0
-
 ;..
 ;..
 ;..
@@ -90,15 +53,6 @@ MOUSE_POS_X_LO   = $0000E1
 MOUSE_POS_X_HI   = $0000E2
 MOUSE_POS_Y_LO   = $0000E3
 MOUSE_POS_Y_HI   = $0000E4
-
-
-
-RAD_ADDR         = $0000F0 ; 3 bytes to avoid OPL2 errors.
-RAD_PATTRN       = $0000F3 ; 1 bytes - offset to pattern
-RAD_PTN_DEST     = $0000F4 ; 3 bytes - where to write the pattern data
-RAD_CHANNEL      = $0000F7 ; 2 bytes - 0 to 8 
-RAD_LAST_NOTE    = $0000F9 ; 1 if this is the last note
-RAD_LINE_PTR     = $0000FA ; 2 bytes - offset to memory location
 
 ;;///////////////////////////////////////////////////////////////
 ;;; NO CODE or Variable ought to be Instantiated in this REGION

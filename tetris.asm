@@ -51,17 +51,32 @@ BOARD_HEIGHT    = 21
 START_BOARD     = $5000 + $40 * 5 + (40-BOARD_WIDTH)/2
 NEXT_PIECE_LOC  = $5000 + $40 *11 + 31
 PIECE_VALUE     = $25  ; we're doing BCD additions
-LINE_VALUE      = 100
+
+EFFECT_T_POSITION = $60 ; 4 bytes
+EFFECT_T_WAIT_CNTR= $64 ; 2 bytes
+EFFECT_L_POSITION = $66 ; 4 bytes
+EFFECT_L_WAIT_CNTR= $6a ; 2 bytes
+EFFECT_R_POSITION = $6c ; 4 bytes
+
 MSG_ADDR        = $70
 DEL_LINE_PTR    = $70
 ROT_VAL         = $72
 ROT_VAL2        = $73
 LINE_CNTR       = $74
 COPY_LINE_PTR   = $76
-TOTAL_LINES     = $78
+TOTAL_LINES     = $78 ; reserving 2 bytes
+
+EFFECT_PLAY       = $7A ; 1 byte - 0 nothing, 1 tile down, 2 line, 4 rotate.
+  TILE_EFFECT     = $1
+  LINE_EFFECT     = $2
+  ROTATE_EFFECT   = $4
+EFFECT_R_WAIT_CNTR= $7B ; 2 bytes
+BUTTON_PRESS      = $7D ; 1 byte
+
 GAME_OVER_TIMER = $80 ; 1 byte
 GAME_OVER_TICK  = $81 ; 1 byte
 INTRO_SLIDE_CNT = $82 ; 1 byte
+JOYSTICK_POLL   = $83 ; 1 byte
 
 OPM_BASE_ADDRESS  = $AFF000
 PSG_BASE_ADDRESS  = $AFF100
@@ -81,6 +96,7 @@ GAME_START
                 STA KEYBOARD_SC_FLG
                 STA MOUSE_PTR_CTRL_REG_L ; disable the mouse pointer
                 STA VKY_TXT_CURSOR_CTRL_REG ; disable the cursor
+                STA EFFECT_PLAY
                 
                 setal
                 LDA #5
@@ -93,7 +109,7 @@ GAME_START
                 
                 JSR CLEAR_TILESET
                 
-                JSR VGM_INIT_TIMER0
+                JSR VGM_INIT_TIMERS
                 
                 ; set the display mode to tiles
                 LDA #Mstr_Ctrl_TileMap_En + Mstr_Ctrl_Bitmap_En + Mstr_Ctrl_Text_Mode_En + Mstr_Ctrl_Graph_Mode_En + Mstr_Ctrl_Text_Overlay
@@ -107,7 +123,7 @@ GAME_START
                 JSL CLRSCREEN
                 
                 ; Enable SOF and TIMER0
-                LDA #~( FNX0_INT00_SOF | FNX0_INT02_TMR0 )
+                LDA #~( FNX0_INT00_SOF | FNX0_INT02_TMR0 | FNX0_INT03_TMR1)
                 STA @lINT_MASK_REG0
                 ; Enable Keyboard
                 LDA #~( FNX1_INT00_KBD )
@@ -181,7 +197,9 @@ DISPLAY_BOARD_LOOP
                 
         NOT_GAME_OVER
                 ; set the piece in place
+                JSR PLAY_EFFECT_TILE_DOWN
                 JSR COPY_PIECE
+                
                 setal
                 SED
                 CLC
@@ -445,6 +463,64 @@ GET_PIECE_VALUE
                 PLX
                 
                 RTS
+                
+; *****************************************************************************
+; * Handle Joystick Movements
+; * Remember that the joystick at rest returns $9F.
+; * Poll the joystick 10 times a second.
+; *****************************************************************************
+HANDLE_JOYSTICK
+                .as
+                LDA JOYSTICK_POLL
+                INC A
+                STA JOYSTICK_POLL
+                CMP #6
+                BNE JS_DONE
+                
+                STZ JOYSTICK_POLL
+                LDA JOYSTICK0
+                
+                ; we don't care about up #1
+                BIT #2 ; down
+                BNE JS_LEFT
+                
+                STZ BUTTON_PRESS
+                JSR MOVE_PIECE_DOWN
+                BRA JS_DONE
+                
+        JS_LEFT
+                BIT #4 ; left
+                BNE JS_RIGHT
+                
+                STZ BUTTON_PRESS
+                JSR MOVE_PIECE_LEFT
+                BRA JS_DONE
+                
+        JS_RIGHT
+                BIT #8 ; right
+                BNE JS_BUTTON
+                
+                STZ BUTTON_PRESS
+                JSR MOVE_PIECE_RIGHT
+                BRA JS_DONE
+                
+        JS_BUTTON
+                BIT #$10 ; button
+                BNE JS_NONE
+                
+                LDA BUTTON_PRESS
+                BNE JS_DONE
+                
+                LDA #1
+                STA BUTTON_PRESS
+                JSR ROTATE_PIECE
+                RTS
+                
+        JS_NONE
+                STZ BUTTON_PRESS
+        JS_DONE
+                RTS
+                
 ; *****************************************************************************
 ; * User Pressed Left Arrow
 ; *****************************************************************************
@@ -565,8 +641,10 @@ ROTATE_PIECE
                 LDA #3
     UNDO_ROT_COLISION
                 STA PIECE_ROT
+                RTS
                 
     ROTATE_DONE
+                JSR PLAY_EFFECT_ROTATE
                 RTS
                 
 ; *****************************************************************************
@@ -935,6 +1013,9 @@ REMOVE_LINES_LOOP
                 JSR DISPLAY_HEX
                 LDA #0
                 JSR DISPLAY_HEX
+                ; play sound effect
+                JSR PLAY_EFFECT_LINE
+                
                 BRA SKIP_DELETE_LINES
     WAIT_FOR_50
                 CMP #50
@@ -1438,19 +1519,9 @@ CLEAR_TILESET
                 CPY #$800
                 BNE CLEAR_TS_LOOP
                 RTS
-                
-HANDLE_JOYSTICK
-                .as
-                LDA JOYSTICK0
-                BIT #1 ; up
-                BIT #2 ; down
-                BIT #4 ; left
-                BIT #8 ; right
-                BIT #$10 ; button
-                RTS
 
-;.include "opl_library.asm"
 .include "vgm_player.asm"
+.include "vgm_effect.asm"
 
 ; *****************************************************************************
 ; * variables
@@ -1528,6 +1599,12 @@ BACKGROUND_PAL
 .binary "background.data.pal"
 PALETTE
 .binary "tetris-tiles.data.pal"
+
+VGM_EFFECT_DROP
+VGM_EFFECT_ROTATE
+.binary "tile-down.vgm"
+VGM_EFFECT_LINE
+.binary "bar.vgm"
 
 VGM_INTRO_MUSIC
 .binary "music/02 Strolling Player.vgm"
