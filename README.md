@@ -7,6 +7,10 @@ The game demonstrates the use of the SOF and keybaord interrupts, tiles and back
 ![Emulated Image](/screenshots/game.png)
 
 The game is functional in the C256 Foenix IDE and the Rev C4 revision of the board.
+The game has:
+* three states: intro, play and game-over
+* back-ground music
+* special effects for tiles and lines
 
 Still to be added are:
 * High-Score Board
