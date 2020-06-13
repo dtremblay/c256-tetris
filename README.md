@@ -9,5 +9,4 @@ The game demonstrates the use of the SOF and keybaord interrupts, tiles and back
 The game is functional in the C256 Foenix IDE and the Rev C4 revision of the board.
 
 Still to be added are:
-* Joystick
-* music (this won't work in the emulator)
+* High-Score Board
