@@ -71,11 +71,12 @@ KEYBOARD_INTERRUPT
                 setxs
     MORE_KEYS
                 LDA KBD_INPT_BUF        ; Get Scan Code from KeyBoard
-                ;CMP KEYBOARD_SC_TMP     ; don't accept auto-repeat
-                ;BEQ DONT_REACT
-                
-                ;STA KEYBOARD_SC_TMP     ; Save Code Immediately
                 TAX
+                
+                LDA GAME_STATE
+                CMP #5
+                BEQ NAME_ENTRY
+                
                 LDA ScanCode_Press_Set1,X
                 TAX
                 CPX #0
@@ -83,9 +84,24 @@ KEYBOARD_INTERRUPT
                 LDA GAME_STATE
                 CMP #GS_LINE_BONUS
                 BEQ DONT_REACT
-                
                 setxl
                 JSR (KEY_JUMP_TABLE,X)
+
+                RTS
+                
+    NAME_ENTRY
+                LDA ScanCode_Press_Set2,X
+                CMP #0
+                BEQ DONT_REACT
+
+                CMP #$E
+                BEQ KEY_BACKSPACE
+                JSR ADD_CHAR
+                BRA DONT_REACT
+                
+    KEY_BACKSPACE
+                JSR DEL_CHAR
+                
     DONT_REACT
                 setxl
 
@@ -240,4 +256,14 @@ EXIT_FOR_NEXT_VALUE
                 STX MOUSE_PTR
 
                 setxl
+                RTS
+                
+ADD_CHAR        .as
+                .xs
+                
+                RTS
+                
+DEL_CHAR        .as
+                .xs
+                
                 RTS

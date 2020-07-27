@@ -32,7 +32,7 @@ Vky_Cursor_Flash_Rate0  = $02
 Vky_Cursor_Flash_Rate1  = $04
 Vky_Cursor_FONT_Page0   = $08       ; Pick Font Page 0 or Font Page 1
 Vky_Cursor_FONT_Page1   = $10       ; Pick Font Page 0 or Font Page 1
-VKY_TXT_RESERVED        = $AF0011   ;Not in Use
+VKY_TXT_START_ADD_PTR   = $AF0011   ; This is an offset to change the Starting address of the Text Mode Buffer (in x)
 VKY_TXT_CURSOR_CHAR_REG = $AF0012
 
 VKY_TXT_CURSOR_COLR_REG = $AF0013
@@ -41,7 +41,15 @@ VKY_TXT_CURSOR_X_REG_H  = $AF0015
 VKY_TXT_CURSOR_Y_REG_L  = $AF0016
 VKY_TXT_CURSOR_Y_REG_H  = $AF0017
 
-TXT_CLR_START_DISPLAY_PTR = $AF0018  ; (0 to 255) (this Add a X Offset to the Display Start Address)
+
+; Line Interrupt Registers
+VKY_LINE_IRQ_CTRL_REG   = $AF001B ;[0] - Enable Line 0, [1] -Enable Line 1
+VKY_LINE0_CMP_VALUE_LO  = $AF001C ;Write Only [7:0]
+VKY_LINE0_CMP_VALUE_HI  = $AF001D ;Write Only [3:0]
+VKY_LINE1_CMP_VALUE_LO  = $AF001E ;Write Only [7:0]
+VKY_LINE1_CMP_VALUE_HI  = $AF001F ;Write Only [3:0]
+
+; When you Read the Register
 
 VKY_INFO_CHIP_NUM_L     = $AF001C
 VKY_INFO_CHIP_NUM_H     = $AF001D

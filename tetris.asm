@@ -6,7 +6,7 @@
 ; * for the C256 Foenix.
 ; * Copyright Daniel Tremblay 2020
 ; * This code is provided without warranty.
-; * Please attribute credits to Daniel Tremblay is you reuse.
+; * Please attribute credits to Daniel Tremblay if you reuse.
 ; *************************************************************************
 .cpu "65816"
 .include "macros_inc.asm"
@@ -37,12 +37,14 @@ PIECE_FIT       .byte 0
 GAME_SPEED      .byte 0 ; how many ticks beteen bars falling
 PIECE_CNTR      .byte 0  ; we increase the speed of the game for every 10 pieces
 SCORE           .fill 4, 0  ; decimal formatted score
-GAME_STATE      .byte 4  ; 0 - running, 1 - game over, 2 - restarting, 3 - display line bonus, 4 - intro display
-GS_RUNNING      = 0
-GS_GAME_OVER    = 1
-GS_RESTARTING   = 2
-GS_LINE_BONUS   = 3
-GS_INTRO        = 4
+GAME_STATE      .byte 4
+GS_RUNNING      = 0   ;  0 - running,  
+GS_GAME_OVER    = 1   ;  1 - game over, 
+GS_RESTARTING   = 2   ;  2 - restarting, 
+GS_LINE_BONUS   = 3   ;  3 - display line bonus, 
+GS_INTRO        = 4   ;  4 - intro display
+GS_NAME_ENTRY   = 5   ;  5 - name entry
+
 LEVEL           .byte 1
 
 INITIAL_GAME_SPEED = 40
@@ -104,6 +106,8 @@ GAME_START
                 STA PIECE_X
                 setas
                 JSR LOAD_GAME_ASSETS
+                JSR LOAD_HI_SCORES
+                
                 LDA #GS_INTRO
                 STA GAME_STATE
                 
@@ -253,6 +257,7 @@ DISPLAY_BOARD_LOOP
     LOGIC_DONE
                 JSR DRAW_BOARD
                 JSR DRAW_PIECE
+                JSR DRAW_HI_SCORE
                 JSR DRAW_SCORE
                 JSR DRAW_LEVEL
                 JSR DRAW_LINES
@@ -945,6 +950,28 @@ DRAW_SCORE
                 
                 RTS
                 
+DRAW_HI_SCORE
+                .as
+                RTS
+                
+                LDY #$A000 + $80 * 5 + 6
+                STY CURSORPOS
+                LDA #$20
+                STA CURCOLOR
+                
+                LDY #<>HI_SCORE_MSG
+                STY MSG_ADDR
+                JSR DISPLAY_MSG
+                
+                INC CURSORPOS
+                LDA HI_SCORES + 8
+                JSR DISPLAY_HEX
+                LDA HI_SCORES + 7
+                JSR DISPLAY_HEX
+                LDA HI_SCORES + 6
+                JSR DISPLAY_HEX
+                
+                RTS
 DRAW_LEVEL
                 .as
                 LDY #$A000 + $80 * 7 + 56
@@ -1520,6 +1547,26 @@ CLEAR_TILESET
                 BNE CLEAR_TS_LOOP
                 RTS
 
+; *****************************************************************************
+; *  Load the high scores from SD Card
+; *  The file named "tetris.scr" must be present in the root sector.
+; *****************************************************************************
+LOAD_HI_SCORES
+                .as
+                ; check if the sd card is present
+                ; read mbr
+                ; read boot sector
+                RTS
+                
+                
+; *****************************************************************************
+; *  Save the high scores to SD Card
+; *  The file "tetris.scr" will be saved in the root sector.
+; *****************************************************************************
+SAVE_HI_SCORES
+                .as
+                RTS
+
 .include "vgm_player.asm"
 .include "vgm_effect.asm"
 
@@ -1538,6 +1585,7 @@ RESTART_MSG     .text 'Restart in ',0
 INTRO_MSG       .text 'Welcome to C256 Tetris',0
 MACHINE_DESIGNER_MSG .text 'Hardware Designer: Stefany Allaire',0
 SOFTWARE_DEV_MSG     .text 'Software Developer: Daniel Tremblay',0
+HI_SCORE_MSG    .text 'HI SCORE:',0
 BYTE_CNTR       .word 0
 PIECE0
     .byte 0,0,1,0
@@ -1580,6 +1628,7 @@ PIECE6
     .byte 0,1,1,0
     .byte 0,0,1,0
     .byte 0,0,0,0
+
 BOARD
 .rept BOARD_HEIGHT - 1
     .byte '#'
@@ -1593,6 +1642,15 @@ BOARD
 .rept BOARD_WIDTH
     .byte '#'
 .next
+
+HI_SCORES
+    .text 'DAN   '
+    .byte $11,$11,$11
+.rept 9
+    .fill 6, 20   ; only 6 characters for the name
+    .fill 4, 0    ; BCD encoded score
+.next
+
 TILES
 .binary "tetris-tiles.data"
 BACKGROUND_PAL
