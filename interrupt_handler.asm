@@ -71,6 +71,8 @@ KEYBOARD_INTERRUPT
                 setxs
     MORE_KEYS
                 LDA KBD_INPT_BUF        ; Get Scan Code from KeyBoard
+                CMP #$7F
+                BGE DONT_REACT
                 TAX
                 
                 LDA GAME_STATE
@@ -86,10 +88,10 @@ KEYBOARD_INTERRUPT
                 BEQ DONT_REACT
                 setxl
                 JSR (KEY_JUMP_TABLE,X)
-
                 RTS
                 
     NAME_ENTRY
+                .xs
                 LDA ScanCode_Press_Set2,X
                 CMP #0
                 BEQ DONT_REACT
@@ -104,7 +106,6 @@ KEYBOARD_INTERRUPT
                 
     DONT_REACT
                 setxl
-
                 RTS
                 
 KEY_JUMP_TABLE
@@ -258,12 +259,32 @@ EXIT_FOR_NEXT_VALUE
                 setxl
                 RTS
                 
+; *******************************************************************
+; * The pointer to the hi-score entry line must be provided
+; *******************************************************************
 ADD_CHAR        .as
                 .xs
                 
+                LDA HISCORE_LINE
+                ADC HISCORE_OFFSET
+                TAX
+                STA HI_SCORES,X
+                
+                LDA HISCORE_OFFSET
+                CMP #6
+                BEQ A_C_DONE
+                
+                INC HISCORE_OFFSET
+                
+        A_C_DONE
                 RTS
                 
 DEL_CHAR        .as
                 .xs
+                LDA HISCORE_OFFSET
+                BEQ D_C_DONE
                 
+                DEC HISCORE_OFFSET
+                
+        D_C_DONE
                 RTS

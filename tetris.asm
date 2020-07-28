@@ -74,6 +74,8 @@ EFFECT_PLAY       = $7A ; 1 byte - 0 nothing, 1 tile down, 2 line, 4 rotate.
   ROTATE_EFFECT   = $4
 EFFECT_R_WAIT_CNTR= $7B ; 2 bytes
 BUTTON_PRESS      = $7D ; 1 byte
+HISCORE_LINE      = $7E ; 1 byte
+HISCORE_OFFSET    = $7F ; 1 byte
 
 GAME_OVER_TIMER = $80 ; 1 byte
 GAME_OVER_TICK  = $81 ; 1 byte
@@ -90,6 +92,9 @@ SONG_START        = $84 ; 4 bytes
 CURRENT_POSITION  = $88 ; 4 bytes
 WAIT_CNTR         = $8C ; 2 bytes
 LOOP_OFFSET_REG   = $8E ; 2 bytes
+
+; TEMPORARY MEMORY LOCATION
+TEMP_LOCATION     = $90 ; 2 bytes
 
 GAME_START      
                 setas
@@ -952,9 +957,8 @@ DRAW_SCORE
                 
 DRAW_HI_SCORE
                 .as
-                RTS
-                
-                LDY #$A000 + $80 * 5 + 6
+                ; display "HI SCORE:"
+                LDY #$A000 + $80 * 5 + 3
                 STY CURSORPOS
                 LDA #$20
                 STA CURCOLOR
@@ -963,12 +967,23 @@ DRAW_HI_SCORE
                 STY MSG_ADDR
                 JSR DISPLAY_MSG
                 
+                ; display the name of the user with highest score
+                LDY #$A000 + $80 * 6 + 3
+                STY CURSORPOS
+                LDA #$20
+                STA CURCOLOR
+                
+                LDY #<>HI_SCORES
+                STY MSG_ADDR
+                JSR DISPLAY_MSG
+                
                 INC CURSORPOS
+                ; display the score
+                LDA HI_SCORES + 9
+                JSR DISPLAY_HEX
                 LDA HI_SCORES + 8
                 JSR DISPLAY_HEX
                 LDA HI_SCORES + 7
-                JSR DISPLAY_HEX
-                LDA HI_SCORES + 6
                 JSR DISPLAY_HEX
                 
                 RTS
@@ -1127,8 +1142,20 @@ DISPLAY_MSG
                 
 GAME_OVER
                 .as
+                ; check if the score is one of the 10 highest
+                JSR CHECK_SCORE
                 
+                LDA HISCORE_LINE
+                CMP #10
+                BEQ NOT_A_HISCORE
+                
+                ; show the user name entry screen
+                LDA #GS_NAME_ENTRY
+                BRA G_O_RESUME
+                
+        NOT_A_HISCORE
                 LDA #GS_GAME_OVER
+        G_O_RESUME
                 STA GAME_STATE
                 LDA #0
                 STA GAME_OVER_TICK
@@ -1566,6 +1593,86 @@ LOAD_HI_SCORES
 SAVE_HI_SCORES
                 .as
                 RTS
+                
+; *****************************************************************************
+; * Compare the player score with the 10 highest
+; * If one is found to be lower, then insert a new line (drop the last line) 
+; * and write the score there
+; *****************************************************************************
+CHECK_SCORE     
+                .as
+                LDA #0
+                STA HISCORE_LINE
+                STA HISCORE_OFFSET
+                LDX #0
+
+        C_S_LOOP
+                LDA HI_SCORES+9,X
+                CMP SCORE+2
+                BLT C_S_INSERT_LINE
+                
+                LDA HI_SCORES+8,X
+                CMP SCORE+1
+                BLT C_S_INSERT_LINE
+                
+                LDA HI_SCORES+7,X
+                CMP SCORE
+                BLT C_S_INSERT_LINE
+                
+                INC HISCORE_LINE
+                TXA
+                CLC
+                ADC #10
+                STA TEMP_LOCATION
+                TAX
+                
+                LDA HISCORE_LINE
+                CMP #10
+                BNE C_S_LOOP
+                BRA C_S_DONE
+                
+    C_S_INSERT_LINE
+                
+                ; start moving byte starting from the end
+                LDX #100-10-1
+        C_S_INSERT_LINE_LOOP
+                LDA HI_SCORES,X
+                STA HI_SCORES+10,X
+                DEX
+                CPX TEMP_LOCATION
+                BNE C_S_INSERT_LINE_LOOP
+                
+                ; copy _ in the first 6 characters,then 0, and then the player score
+                LDA #0
+                LDY #6
+                XBA
+                LDA TEMP_LOCATION
+                TAX
+                LDA #'_'
+        CS_EMPTY_CHAR_LOOP
+                STA HI_SCORES,X
+                INX
+                DEY
+                BNE CS_EMPTY_CHAR_LOOP
+                LDA #0
+                STA HI_SCORES,X
+                INX
+                
+                LDA SCORE
+                STA HI_SCORES,X
+                INX
+                
+                LDA SCORE+1
+                STA HI_SCORES,X
+                INX
+                
+                LDA SCORE+2
+                STA HI_SCORES,X
+    
+        C_S_DONE
+                RTS
+                
+                
 
 .include "vgm_player.asm"
 .include "vgm_effect.asm"
@@ -1644,10 +1751,10 @@ BOARD
 .next
 
 HI_SCORES
-    .text 'DAN   '
-    .byte $11,$11,$11
+    .text 'DAN   ',0
+    .byte $86,$24,$00 ; little-endian
 .rept 9
-    .fill 6, 20   ; only 6 characters for the name
+    .fill 6, $20   ; only 6 characters for the name, null terminated
     .fill 4, 0    ; BCD encoded score
 .next
 
