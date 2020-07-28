@@ -1203,6 +1203,20 @@ GAME_OVER
                 LDA SCORE
                 JSR DISPLAY_HEX
                 
+                LDA GAME_STATE
+                CMP #GS_NAME_ENTRY
+                BNE G_O_SKIP_ENTRY_MSG
+                
+                LDY #$A000 + 128*32 + 24
+                STY CURSORPOS
+                LDA #$23
+                STA CURCOLOR
+                ; display USER_NAME_ENTRY PROMPT
+                LDY #<>ENTER_USERNAME_MSG
+                STY MSG_ADDR
+                JSR DISPLAY_MSG
+                
+        G_O_SKIP_ENTRY_MSG
                 JSR DISPLAY_COUNTDOWN
                 
                 ; clear the board
@@ -1232,6 +1246,7 @@ GAME_OVER
                 
                 LDA #0
                 STA PIECE_Y
+                
                 
                 RTS
                 
@@ -1634,10 +1649,10 @@ CHECK_SCORE
     C_S_INSERT_LINE
                 
                 ; start moving byte starting from the end
-                LDX #100-10-1
+                LDX #100-10
         C_S_INSERT_LINE_LOOP
-                LDA HI_SCORES,X
-                STA HI_SCORES+10,X
+                LDA HI_SCORES,X-1
+                STA HI_SCORES+10,X-1
                 DEX
                 CPX TEMP_LOCATION
                 BNE C_S_INSERT_LINE_LOOP
@@ -1693,6 +1708,7 @@ INTRO_MSG       .text 'Welcome to C256 Tetris',0
 MACHINE_DESIGNER_MSG .text 'Hardware Designer: Stefany Allaire',0
 SOFTWARE_DEV_MSG     .text 'Software Developer: Daniel Tremblay',0
 HI_SCORE_MSG    .text 'HI SCORE:',0
+ENTER_USERNAME_MSG .text 'ENTER USER NAME:',0
 BYTE_CNTR       .word 0
 PIECE0
     .byte 0,0,1,0

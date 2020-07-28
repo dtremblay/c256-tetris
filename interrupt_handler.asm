@@ -92,17 +92,41 @@ KEYBOARD_INTERRUPT
                 
     NAME_ENTRY
                 .xs
+                CPX #$E
+                BEQ BACKSPACE_KEY
+                
+                CPX #$1C
+                BEQ ENTER_KEY
+                
                 LDA ScanCode_Press_Set2,X
                 CMP #0
                 BEQ DONT_REACT
-
-                CMP #$E
-                BEQ KEY_BACKSPACE
+                
                 JSR ADD_CHAR
                 BRA DONT_REACT
                 
-    KEY_BACKSPACE
+    BACKSPACE_KEY
                 JSR DEL_CHAR
+                BRA DONT_REACT
+                
+    ENTER_KEY
+                ; replace all _ with space
+                LDA HISCORE_OFFSET
+                CMP #6
+                BEQ E_K_DONE
+                CLC
+                ADC TEMP_LOCATION
+                
+                TAX
+                LDA #$20
+                
+                STA HI_SCORES,X
+                INC HISCORE_OFFSET
+                BRA ENTER_KEY
+                
+        E_K_DONE
+                LDA #GS_GAME_OVER
+                STA GAME_STATE
                 
     DONT_REACT
                 setxl
@@ -180,8 +204,29 @@ SOF_INTERRUPT
                 
     CHK_INTRO_SCREEN
                 CMP #4
-                BNE SOF_DONE
+                BNE CHK_ENTRY_SCREEN
                 JSR INTRO_LOOP
+                
+    CHK_ENTRY_SCREEN
+                CMP #5
+                BNE SOF_DONE
+                
+                ; write the user entry
+                LDY #$A000 + 128*32 + 40
+                STY CURSORPOS
+                LDA #$23
+                STA CURCOLOR
+                
+                ; display USER_NAME_ENTRY PROMPT
+                setal
+                LDA #<>HI_SCORES
+                CLC
+                ADC TEMP_LOCATION
+                STA MSG_ADDR
+                setas
+
+                JSR DISPLAY_MSG
+                
     SOF_DONE
                 RTS
 
@@ -264,17 +309,17 @@ EXIT_FOR_NEXT_VALUE
 ; *******************************************************************
 ADD_CHAR        .as
                 .xs
-                
-                LDA HISCORE_LINE
-                ADC HISCORE_OFFSET
-                TAX
-                STA HI_SCORES,X
-                
+                PHA
                 LDA HISCORE_OFFSET
                 CMP #6
                 BEQ A_C_DONE
                 
                 INC HISCORE_OFFSET
+                CLC
+                ADC TEMP_LOCATION
+                TAX
+                PLA
+                STA HI_SCORES,X
                 
         A_C_DONE
                 RTS
