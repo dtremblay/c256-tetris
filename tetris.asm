@@ -262,7 +262,7 @@ DISPLAY_BOARD_LOOP
     LOGIC_DONE
                 JSR DRAW_BOARD
                 JSR DRAW_PIECE
-                JSR DRAW_HI_SCORE
+                JSR DRAW_HI_SCORES
                 JSR DRAW_SCORE
                 JSR DRAW_LEVEL
                 JSR DRAW_LINES
@@ -955,9 +955,9 @@ DRAW_SCORE
                 
                 RTS
                 
-DRAW_HI_SCORE
+DRAW_HI_SCORES
                 .as
-                ; display "HI SCORE:"
+                ; display "HI SCORES:"
                 LDY #$A000 + $80 * 5 + 3
                 STY CURSORPOS
                 LDA #$20
@@ -967,25 +967,52 @@ DRAW_HI_SCORE
                 STY MSG_ADDR
                 JSR DISPLAY_MSG
                 
-                ; display the name of the user with highest score
+                ; display the highest scores
                 LDY #$A000 + $80 * 6 + 3
                 STY CURSORPOS
-                LDA #$20
-                STA CURCOLOR
                 
                 LDY #<>HI_SCORES
                 STY MSG_ADDR
+                
+                LDX #0
+                
+    DHS_NEXT_SCORE
+                
                 JSR DISPLAY_MSG
                 
                 INC CURSORPOS
                 ; display the score
-                LDA HI_SCORES + 9
+                setas
+                LDA HI_SCORES + 9,X
                 JSR DISPLAY_HEX
-                LDA HI_SCORES + 8
+                LDA HI_SCORES + 8,X
                 JSR DISPLAY_HEX
-                LDA HI_SCORES + 7
+                LDA HI_SCORES + 7,X
                 JSR DISPLAY_HEX
                 
+                setal
+                ; increment the score reader to the next line
+                TXA
+                CLC
+                ADC #10
+                TAX
+                
+                ; place the start of the message to the next player's name
+                CLC
+                ADC #<>HI_SCORES
+                STA MSG_ADDR
+                
+                LDA CURSORPOS
+                AND #$FF80 ; each line is 128 characters
+                CLC
+                ADC #$83
+                STA CURSORPOS
+                
+                ; if the score is not zero, then display the name and score
+                LDA HI_SCORES + 7,X
+                setas
+                BNE DHS_NEXT_SCORE
+
                 RTS
 DRAW_LEVEL
                 .as
@@ -1121,6 +1148,7 @@ REMOVE_LINES_LOOP
                 
 DISPLAY_MSG
                 .as
+                PHX
                 PHB
                 LDA #`SCORE_MSG
                 PHA
@@ -1138,6 +1166,7 @@ DISPLAY_MSG
                 BRA MSG_LOOP
                 
     MSG_DONE    PLB
+                PLX
                 RTS
                 
 GAME_OVER
@@ -1269,6 +1298,7 @@ DISPLAY_COUNTDOWN
                 RTS
 DISPLAY_HEX
                 .as
+                PHX
                 PHA
                 XBA
                 LDA #0
@@ -1292,6 +1322,7 @@ DISPLAY_HEX
                 LDA HEX_VALUES,X
                 JSR DISPLAY_SYMBOL
                 INC CURSORPOS
+                PLX
                 RTS
 
 ; *****************************************************************************
@@ -1707,7 +1738,7 @@ RESTART_MSG     .text 'Restart in ',0
 INTRO_MSG       .text 'Welcome to C256 Tetris',0
 MACHINE_DESIGNER_MSG .text 'Hardware Designer: Stefany Allaire',0
 SOFTWARE_DEV_MSG     .text 'Software Developer: Daniel Tremblay',0
-HI_SCORE_MSG    .text 'HI SCORE:',0
+HI_SCORE_MSG    .text 'HI SCORES:',0
 ENTER_USERNAME_MSG .text 'ENTER USER NAME:',0
 BYTE_CNTR       .word 0
 PIECE0
@@ -1788,7 +1819,8 @@ VGM_EFFECT_LINE
 .binary "bar.vgm"
 
 VGM_INTRO_MUSIC
-.binary "music/02 Strolling Player.vgm"
+;.binary "music/02 Strolling Player.vgm"
+.binary "music/01 Peddler.vgm"
 VGM_PLAY_MUSIC
 .binary "music/05 Troika.vgm"
 VGM_GAME_OVER_MUSIC

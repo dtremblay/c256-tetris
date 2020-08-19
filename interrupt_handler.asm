@@ -128,6 +128,18 @@ KEYBOARD_INTERRUPT
                 LDA #GS_GAME_OVER
                 STA GAME_STATE
                 
+                ; ERASE the ENTRY text
+                setxl
+                LDY #$A000 + 128*32 + 24
+                STY CURSORPOS
+                LDX #40 ; the number of characters to delete
+                LDA #0
+        ERASE_ENTRY_LOOP
+                STA [CURSORPOS]
+                INC CURSORPOS
+                DEX
+                BNE ERASE_ENTRY_LOOP
+                
     DONT_REACT
                 setxl
                 RTS
@@ -206,6 +218,7 @@ SOF_INTERRUPT
                 CMP #4
                 BNE CHK_ENTRY_SCREEN
                 JSR INTRO_LOOP
+                BRA SOF_DONE
                 
     CHK_ENTRY_SCREEN
                 CMP #5
