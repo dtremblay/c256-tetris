@@ -2,7 +2,7 @@
 Plain Tetris Game for the C256 Foenix (https://c256foenix.com/).
 
 This is a free game for the C256 Foenix.  The game uses very simple assembly code to get things done.
-The game demonstrates the use of the SOF and keybaord interrupts, tiles, background images and music.
+The game demonstrates the use of the SOF and keybaord interrupts, tiles, background images, music and joystick handling.
 
 ![Emulated Image](/screenshots/game.png)
 
@@ -48,7 +48,7 @@ Only 6 characters are allowed.  Letters, numbers and spaces are accepted.
 Press return when your name has been entered.
 If you make an error, use the <backspace> key to delete.
 
-## 
+
 
 
 
