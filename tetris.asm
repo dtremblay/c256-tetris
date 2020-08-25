@@ -1770,7 +1770,7 @@ CHECK_SCORE
 ; * variables
 ; *****************************************************************************
 HEX_VALUES      .text '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'
-BONUS           .text 0,1,3,6,$10
+BONUS           .text 0,1,3,6,$10 ; these are BCD values
 GAME_OVER_MSG   .text 'GAME OVER',0
 SCORE_MSG       .text 'SCORE:',0
 LEVEL_MSG       .text 'LEVEL:',0
