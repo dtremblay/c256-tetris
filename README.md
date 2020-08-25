@@ -1,5 +1,5 @@
 # C256 Tetris
-Plain Tetris Game for the C256 Foenix
+Plain Tetris Game for the C256 Foenix (https://c256foenix.com/).
 
 This is a free game for the C256 Foenix.  The game uses very simple assembly code to get things done.
 The game demonstrates the use of the SOF and keybaord interrupts, tiles, background images and music.
@@ -17,6 +17,8 @@ Still to be added are:
 * Read and write high score from/to file.
 
 ## How to Play
+To play the game, you will need either the actual C256 Foenix hardware or the C256 Foenix IDE (available here: https://github.com/Trinity-11/FoenixIDE).
+
 The game starts in the intro screen.
 Press <space> or joystick 1 <fire> button to start the game.
 
