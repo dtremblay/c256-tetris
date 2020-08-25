@@ -75,7 +75,7 @@ EFFECT_PLAY       = $7A ; 1 byte - 0 nothing, 1 tile down, 2 line, 4 rotate.
 EFFECT_R_WAIT_CNTR= $7B ; 2 bytes
 BUTTON_PRESS      = $7D ; 1 byte
 HISCORE_LINE      = $7E ; 1 byte
-HISCORE_OFFSET    = $7F ; 1 byte
+; $7F is used by the VGM player - leave it alone
 
 GAME_OVER_TIMER = $80 ; 1 byte
 GAME_OVER_TICK  = $81 ; 1 byte
@@ -95,6 +95,7 @@ LOOP_OFFSET_REG   = $8E ; 2 bytes
 
 ; TEMPORARY MEMORY LOCATION
 TEMP_LOCATION     = $90 ; 2 bytes
+HISCORE_OFFSET    = $92 ; 1 byte
 
 GAME_START      
                 setas
@@ -104,16 +105,26 @@ GAME_START
                 STA MOUSE_PTR_CTRL_REG_L ; disable the mouse pointer
                 STA VKY_TXT_CURSOR_CTRL_REG ; disable the cursor
                 STA EFFECT_PLAY
+                STA HISCORE_OFFSET
                 
                 setal
                 LDA #5
                 STA GABE_RNG_SEED_LO ; set the max value from 0 to 6
                 STA PIECE_X
+                
+                ; test the hi score is working
+                ;LDA #0 ; test hiscore
+                ;STA SCORE + 2 ; test hiscore
+                ;LDA #$3175 ; this score should be at the top
+                ;STA SCORE ; test hiscore
                 setas
+                ;JSR CHECK_SCORE ; test hiscore
+                
                 JSR LOAD_GAME_ASSETS
-                JSR LOAD_HI_SCORES
+                ;JSR LOAD_HI_SCORES
                 
                 LDA #GS_INTRO
+                ;LDA #GS_NAME_ENTRY ; test hiscore
                 STA GAME_STATE
                 
                 JSR CLEAR_TILESET
@@ -1236,6 +1247,20 @@ GAME_OVER
                 CMP #GS_NAME_ENTRY
                 BNE G_O_SKIP_ENTRY_MSG
                 
+                ; display Press Return when done message
+                LDY #$A000 + 128*36 + 24
+                STY CURSORPOS
+                LDY #<>RETURN_DONE_MSG
+                STY MSG_ADDR
+                JSR DISPLAY_MSG
+                
+                ; display Backspace message
+                LDY #$A000 + 128*37 + 24
+                STY CURSORPOS
+                LDY #<>BKSP_MSG
+                STY MSG_ADDR
+                JSR DISPLAY_MSG
+                
                 LDY #$A000 + 128*32 + 24
                 STY CURSORPOS
                 LDA #$23
@@ -1627,8 +1652,20 @@ CLEAR_TILESET
 LOAD_HI_SCORES
                 .as
                 ; check if the sd card is present
-                ; read mbr
-                ; read boot sector
+                setal
+                LDA #<>tetris_scr
+                STA DOS_FD_PTR
+                
+                LDA #<>SCORE_PATH
+                STA FILEDESC.PATH
+                setas
+                LDA #`tetris_scr
+                STA DOS_FD_PTR + 2
+                LDA #`SCORE_PATH
+                STA FILEDESC.PATH + 2
+                
+                JSL F_OPEN
+                
                 RTS
                 
                 
@@ -1648,23 +1685,29 @@ SAVE_HI_SCORES
 CHECK_SCORE     
                 .as
                 LDA #0
+                XBA
+                LDA #0
                 STA HISCORE_LINE
                 STA HISCORE_OFFSET
+                STA TEMP_LOCATION
                 LDX #0
 
         C_S_LOOP
                 LDA HI_SCORES+9,X
                 CMP SCORE+2
                 BLT C_S_INSERT_LINE
+                BNE C_S_NEXT
                 
                 LDA HI_SCORES+8,X
                 CMP SCORE+1
                 BLT C_S_INSERT_LINE
+                BNE C_S_NEXT
                 
                 LDA HI_SCORES+7,X
                 CMP SCORE
                 BLT C_S_INSERT_LINE
                 
+        C_S_NEXT
                 INC HISCORE_LINE
                 TXA
                 CLC
@@ -1740,7 +1783,11 @@ MACHINE_DESIGNER_MSG .text 'Hardware Designer: Stefany Allaire',0
 SOFTWARE_DEV_MSG     .text 'Software Developer: Daniel Tremblay',0
 HI_SCORE_MSG    .text 'HI SCORES:',0
 ENTER_USERNAME_MSG .text 'ENTER USER NAME:',0
+RETURN_DONE_MSG .text 'Press <Enter> when done', 0
+BKSP_MSG        .text 'Press <Bksp> to delete', 0
 BYTE_CNTR       .word 0
+SCORE_PATH      .text 'tetris.scr',0
+
 PIECE0
     .byte 0,0,1,0
     .byte 0,0,1,0
@@ -1804,6 +1851,23 @@ HI_SCORES
     .fill 6, $20   ; only 6 characters for the name, null terminated
     .fill 4, 0    ; BCD encoded score
 .next
+
+; File Descriptor -- Used as parameter for higher level DOS functions
+FILEDESC            .struct
+STATUS              .byte ?             ; The status flags of the file descriptor (open, closed, error, EOF, etc.)
+DEV                 .byte ?             ; The ID of the device holding the file
+PATH                .dword ?            ; Pointer to a NULL terminated path string
+CLUSTER             .dword ?            ; The current cluster of the file.
+FIRST_CLUSTER       .dword ?            ; The ID of the first cluster in the file
+BUFFER              .dword ?            ; Pointer to a cluster-sized buffer
+SIZE                .dword ?            ; The size of the file
+CREATE_DATE         .word ?             ; The creation date of the file
+CREATE_TIME         .word ?             ; The creation time of the file
+MODIFIED_DATE       .word ?             ; The modification date of the file
+MODIFIED_TIME       .word ?             ; The modification time of the file
+                    .ends
+
+tetris_scr .dstruct FILEDESC
 
 TILES
 .binary "tetris-tiles.data"

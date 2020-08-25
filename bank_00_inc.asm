@@ -111,6 +111,7 @@ SDOS_LINE_SELECT = $00031F ; used by the file menu to track which item is select
 SDOS_BYTE_NUMBER = $00032C ; Number of Byte to Read or Write before changing the Pointer
 
 SDOS_BYTE_PTR    = $000334
+DOS_FD_PTR       = $000340      ; 4 bytes - A pointer to a file descriptor
 SDOS_FILE_NAME   = $000380 ; // Max of 128 Chars for the file path
 
 ; COMMAND PARSER Variables

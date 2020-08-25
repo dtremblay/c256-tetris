@@ -132,13 +132,23 @@ KEYBOARD_INTERRUPT
                 setxl
                 LDY #$A000 + 128*32 + 24
                 STY CURSORPOS
-                LDX #40 ; the number of characters to delete
+                
+                LDY #4 ; delete 7 lines
+        ER_NEXT_LINE
+                LDX #128 + 40 ; the number of characters to delete
+                LDA #24
+                STA CURSORPOS
                 LDA #0
+                
         ERASE_ENTRY_LOOP
                 STA [CURSORPOS]
                 INC CURSORPOS
                 DEX
                 BNE ERASE_ENTRY_LOOP
+                
+                INC CURSORPOS+1
+                DEY
+                BNE ER_NEXT_LINE
                 
     DONT_REACT
                 setxl
@@ -333,8 +343,10 @@ ADD_CHAR        .as
                 TAX
                 PLA
                 STA HI_SCORES,X
+                RTS
                 
         A_C_DONE
+                PLA
                 RTS
                 
 DEL_CHAR        .as
@@ -343,6 +355,12 @@ DEL_CHAR        .as
                 BEQ D_C_DONE
                 
                 DEC HISCORE_OFFSET
+                DEC A
+                CLC
+                ADC TEMP_LOCATION
+                TAX
+                LDA #'_'
+                STA HI_SCORES,X
                 
         D_C_DONE
                 RTS
