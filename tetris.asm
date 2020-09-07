@@ -12,7 +12,7 @@
 .include "macros_inc.asm"
 .include "bank_00_inc.asm"
 .include "timer_def.asm"
-.include "vicky_def.asm"
+.include "vicky_ii_def.asm"
 .include "interrupt_def.asm"
 .include "io_def.asm"
 .include "kernel_inc.asm"
@@ -25,6 +25,7 @@
 * = $160000
 .include "interrupt_handler.asm"
 
+COLUMNS_PER_LINE = 80
 TICK_COUNT      .byte 0
 BOARDX          .byte 0
 BOARDY          .byte 0
@@ -121,7 +122,7 @@ GAME_START
                 ;JSR CHECK_SCORE ; test hiscore
                 
                 JSR LOAD_GAME_ASSETS
-                ;JSR LOAD_HI_SCORES
+                JSR LOAD_HI_SCORES
                 
                 LDA #GS_INTRO
                 ;LDA #GS_NAME_ENTRY ; test hiscore
@@ -947,7 +948,7 @@ DRAW_NEXT_PIECE
                 
 DRAW_SCORE
                 .as
-                LDY #$A000 + $80 * 5 + 56
+                LDY #$A000 + COLUMNS_PER_LINE * 5 + 56
                 STY CURSORPOS
                 LDA #$20
                 STA CURCOLOR
@@ -969,7 +970,7 @@ DRAW_SCORE
 DRAW_HI_SCORES
                 .as
                 ; display "HI SCORES:"
-                LDY #$A000 + $80 * 5 + 3
+                LDY #$A000 + COLUMNS_PER_LINE * 5 + 3
                 STY CURSORPOS
                 LDA #$20
                 STA CURCOLOR
@@ -979,7 +980,7 @@ DRAW_HI_SCORES
                 JSR DISPLAY_MSG
                 
                 ; display the highest scores
-                LDY #$A000 + $80 * 6 + 3
+                LDY #$A000 + COLUMNS_PER_LINE * 6 + 3
                 STY CURSORPOS
                 
                 LDY #<>HI_SCORES
@@ -1027,7 +1028,7 @@ DRAW_HI_SCORES
                 RTS
 DRAW_LEVEL
                 .as
-                LDY #$A000 + $80 * 7 + 56
+                LDY #$A000 + COLUMNS_PER_LINE * 7 + 56
                 STY CURSORPOS
                 LDA #$20
                 STA CURCOLOR
@@ -1202,7 +1203,7 @@ GAME_OVER
                 LDA #$30
                 STA GAME_OVER_TIMER
                 
-                LDA #$82 ; we're using a 256 stride
+                LDA #$2 ; disable the tiles
                 STA TL0_CONTROL_REG
                 
                 ; load the game over music
@@ -1216,7 +1217,7 @@ GAME_OVER
                 JSR VGM_SET_SONG_POINTERS
                 
                 JSL CLRSCREEN
-                LDY #$A000 + 128*26 + 31
+                LDY #$A000 + COLUMNS_PER_LINE*26 + 31
                 STY CURSORPOS
                 LDA #$23
                 STA CURCOLOR
@@ -1226,7 +1227,7 @@ GAME_OVER
                 JSR DISPLAY_MSG
                 
                 ; display SCORE
-                LDY #$A000 + 128*27 + 29
+                LDY #$A000 + COLUMNS_PER_LINE*27 + 29
                 STY CURSORPOS
                 LDA #$20
                 STA CURCOLOR
@@ -1248,20 +1249,20 @@ GAME_OVER
                 BNE G_O_SKIP_ENTRY_MSG
                 
                 ; display Press Return when done message
-                LDY #$A000 + 128*36 + 24
+                LDY #$A000 + COLUMNS_PER_LINE*36 + 24
                 STY CURSORPOS
                 LDY #<>RETURN_DONE_MSG
                 STY MSG_ADDR
                 JSR DISPLAY_MSG
                 
                 ; display Backspace message
-                LDY #$A000 + 128*37 + 24
+                LDY #$A000 + COLUMNS_PER_LINE*37 + 24
                 STY CURSORPOS
                 LDY #<>BKSP_MSG
                 STY MSG_ADDR
                 JSR DISPLAY_MSG
                 
-                LDY #$A000 + 128*32 + 24
+                LDY #$A000 + COLUMNS_PER_LINE*32 + 24
                 STY CURSORPOS
                 LDA #$23
                 STA CURCOLOR
@@ -1307,7 +1308,7 @@ GAME_OVER
 DISPLAY_COUNTDOWN
                 .as
                 ; display RESTART
-                LDY #$A000 + 128*29 + 29
+                LDY #$A000 + COLUMNS_PER_LINE*29 + 29
                 STY CURSORPOS
                 LDA #$20
                 STA CURCOLOR
@@ -1413,18 +1414,47 @@ LOAD_GAME_ASSETS
                 LDA #Mstr_Ctrl_Disable_Vid
                 STA MASTER_CTRL_REG_L
                 
+                ; set the tilemap addresses
+                LDA #$5
+                STA TL0_START_ADDY_H
+                STA TL1_START_ADDY_H
+                LDA #0
+                STA TILESET0_ADDY_L + 2 ; tileset offset
+                LDA #$8
+                STA TILESET0_ADDY_CFG ; set stride to 256
+                STA TILESET1_ADDY_CFG ; set stride to 256
+                
                 setal
+                LDA #$0
+                STA TL0_START_ADDY_L
+                STA TL0_WINDOW_X_POS_L
+                STA TL0_WINDOW_Y_POS_L
+                STA TL1_WINDOW_X_POS_L
+                STA TL1_WINDOW_Y_POS_L
+                
+                LDA #$800
+                STA TL1_START_ADDY_L
+                LDA #64
+                STA TL0_TOTAL_X_SIZE_L
+                STA TL1_TOTAL_X_SIZE_L
+                LDA #32
+                STA TL0_TOTAL_Y_SIZE_L
+                STA TL1_TOTAL_Y_SIZE_L
+                
+                LDA #0
+                STA TILESET0_ADDY_L ; offset of the tileset 0 is B0:0000
+                
                 ; load tile palette
                 LDA #$400
                 LDX #<>PALETTE
-                LDY #<>GRPH_LUT1_PTR
-                MVN #`PALETTE,#`GRPH_LUT1_PTR
+                LDY #<>GRPH_LUT0_PTR
+                MVN #`PALETTE,#`GRPH_LUT0_PTR
                 
                 ; load background palette
                 LDA #$400
                 LDX #<>BACKGROUND_PAL
-                LDY #<>GRPH_LUT0_PTR
-                MVN #`PALETTE,#`GRPH_LUT0_PTR
+                LDY #<>GRPH_LUT1_PTR
+                MVN #`BACKGROUND_PAL,#`GRPH_LUT1_PTR
                 
                 ; load background image - need 4 x 64k moves
                 LDA #$FFFF
@@ -1456,21 +1486,17 @@ LOAD_GAME_ASSETS
                 LDY #0
                 MVN `TILES,$B0
                 
-                ; set the width and height of the bitmap
-                LDA #640
-                STA BM_X_SIZE_L
-                LDA #480
-                STA BM_Y_SIZE_L
                 setas
                 PLB ; MVN operations set the bank - so we need to reset
                 
                 ; enable tile layer 0
-                LDA #$83 ; we're using a 256 stride
+                LDA #$1
                 STA TL0_CONTROL_REG
+                STA BM1_START_ADDY_H ; start at $b1:0000
+
+                LDA #$3  ; enable bitmap with LUT 2
+                STA BM1_CONTROL_REG
                 
-                LDA #$1  ; enable bitmap with LUT 2
-                STA BM_CONTROL_REG
-                STA BM_START_ADDY_H ; start at $b1:0000
                 
                 RTS
 ; *****************************************************************************
@@ -1497,6 +1523,9 @@ INIT_GAME
                 LDA #1
                 STA LEVEL
                 
+                LDA #COLUMNS_PER_LINE
+                STA COLS_PER_LINE
+                
                 ; Setup the Interrupt Controller
                 ; For Now all Interrupt are Falling Edge Detection (IRQ)
                 LDA #$FF
@@ -1513,10 +1542,10 @@ INIT_GAME
                 STA @lINT_MASK_REG3
                 
                 JSR CLEAR_TILESET
-                LDA #$83 ; we're using a 256 stride
+                LDA #$1
                 STA TL0_CONTROL_REG
                 
-                LDA #$82 ; we're using a 256 stride
+                LDA #$0 ; we're using a 256 stride
                 STA TL1_CONTROL_REG
                 
                 ; load the play music
@@ -1537,7 +1566,6 @@ INIT_GAME
 
 INTRO_LOOP
                 .as
-                PHB
                 LDA TICK_COUNT
                 INC A
                 STA TICK_COUNT
@@ -1551,32 +1579,43 @@ INTRO_LOOP
                 INC A
                 STA INTRO_SLIDE_CNT
                 
-                LDA #$AF
-                PHA
-                PLB
                 LDX #0
-        IL_NEXT_TILE
-                INX
-                LDA $5800,X
-                CPX #$5C0
-                BEQ INTRO_LOOP_DONE
-                CMP #0
-                BEQ IL_NEXT_TILE
                 
+                ; prepare to copy bytes from mem to video ram
+                LDA #$B5
+                STA CURSORPOS + 2
+                LDY #$0800
+                STY CURSORPOS
+                LDX #0
+                LDY #0
+        IL_NEXT_TILE
+                LDA INTRO_TILESET,X
+                BEQ IT_SKIP
                 INC A
-                STA $5800,X
-                CMP #$9
-                BNE IL_NEXT_TILE
+                CMP #9
+                BNE IT_GOOD
+                
                 LDA #2
-                STA $5800,X
+            IT_GOOD
+                STA INTRO_TILESET,X
+                STA [CURSORPOS],Y
+                
+            IT_SKIP
+                INX
+                INY
+                LDA #0
+                STA [CURSORPOS],Y
+                INY
+                CPX #$5C0
                 BNE IL_NEXT_TILE
                 
     INTRO_LOOP_DONE
-                PLB
                 RTS
 DISPLAY_INTRO
                 .as
-                PHB
+                
+                LDA #0
+                STA TL0_CONTROL_REG
                 
                 ; load the intro music
                 LDA #`VGM_INTRO_MUSIC
@@ -1588,8 +1627,10 @@ DISPLAY_INTRO
                 setas
                 JSR VGM_SET_SONG_POINTERS
                 
-                LDY #$A000 + 128*43 + 26
+                LDY #$A000 + COLUMNS_PER_LINE*43 + 26
                 STY CURSORPOS
+                LDA #$AF
+                STA CURSORPOS + 2
                 LDA #$70
                 STA CURCOLOR
                 
@@ -1597,20 +1638,20 @@ DISPLAY_INTRO
                 STY MSG_ADDR
                 JSR DISPLAY_MSG
                 
-                LDY #$A000 + 128*45 + 19
+                ; display the hardware designer message
+                LDY #$A000 + COLUMNS_PER_LINE*45 + 20
                 STY CURSORPOS
                 LDA #$70
                 STA CURCOLOR
-                
                 LDY #<>MACHINE_DESIGNER_MSG
                 STY MSG_ADDR
                 JSR DISPLAY_MSG
                 
-                LDY #$A000 + 128*47 + 19
+                ; display the software developer message
+                LDY #$A000 + COLUMNS_PER_LINE*47 + 20
                 STY CURSORPOS
                 LDA #$70
                 STA CURCOLOR
-                
                 LDY #<>SOFTWARE_DEV_MSG
                 STY MSG_ADDR
                 JSR DISPLAY_MSG
@@ -1618,30 +1659,42 @@ DISPLAY_INTRO
                 LDA #0
                 STA INTRO_SLIDE_CNT
                 
-                setal
-                LDA #$800
-                LDX #<>INTRO_TILESET
-                LDY #$5800
-                MVN `INTRO_TILESET,$AF
-                setas
+                ; prepare to copy bytes from mem to video ram
+                LDA #$B5
+                STA CURSORPOS + 2
+                LDY #$0800
+                STY CURSORPOS
+                LDX #0
+                LDY #0
+        IT_LOOP
+                LDA INTRO_TILESET,X
+                STA [CURSORPOS],Y
+                INX
+                INY
+                LDA #0
+                STA [CURSORPOS],Y
+                INY
+                CPX #$800
+                BNE IT_LOOP
                 
                 ; enable tile layer 1
-                LDA #$83 ; we're using a 256 stride
+                LDA #$1 ; we're using a 256 stride
                 STA TL1_CONTROL_REG
-                PLB
                 RTS
                 
 CLEAR_TILESET   
                 .as
-                ; clear the tileset
-                LDX #$5000
+                ; clear the tileset - address is B5:0000 in Video RAM
+                LDX #$0
                 STX CURSORPOS
+                LDA #$B5
+                STA CURSORPOS + 2
                 LDA #0
                 LDY #0
         CLEAR_TS_LOOP
                 STA [CURSORPOS],Y
                 INY
-                CPY #$800
+                CPY #$1000  ; each tile is now 16-bits
                 BNE CLEAR_TS_LOOP
                 RTS
 
@@ -1657,15 +1710,20 @@ LOAD_HI_SCORES
                 STA DOS_FD_PTR
                 
                 LDA #<>SCORE_PATH
-                STA FILEDESC.PATH
+                STA tetris_scr.PATH
                 setas
                 LDA #`tetris_scr
                 STA DOS_FD_PTR + 2
                 LDA #`SCORE_PATH
-                STA FILEDESC.PATH + 2
+                STA tetris_scr.PATH + 2
                 
                 JSL F_OPEN
+                ; check if there was an error
+                LDA tetris_scr.STATUS
+                BNE LHS_DONE
                 
+                ; if no errors, copy 100 bytes from the read sector to hi_scores area
+    LHS_DONE
                 RTS
                 
                 
