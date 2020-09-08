@@ -51,8 +51,8 @@ LEVEL           .byte 1
 INITIAL_GAME_SPEED = 40
 BOARD_WIDTH     = 14
 BOARD_HEIGHT    = 21
-START_BOARD     = $5000 + $40 * 5 + (40-BOARD_WIDTH)/2
-NEXT_PIECE_LOC  = $5000 + $40 *11 + 31
+START_BOARD     = (1 + $40 * 5 + (40-BOARD_WIDTH)/2) * 2
+NEXT_PIECE_LOC  = (1 + $40 *11 + 31) * 2
 PIECE_VALUE     = $25  ; we're doing BCD additions
 
 EFFECT_T_POSITION = $60 ; 4 bytes
@@ -141,7 +141,7 @@ GAME_START
                 STA GABE_RNG_CTRL
                 
     NEXT_GAME
-                JSL CLRSCREEN
+                JSL CLRSCREEN ; clears the text
                 
                 ; Enable SOF and TIMER0
                 LDA #~( FNX0_INT00_SOF | FNX0_INT02_TMR0 | FNX0_INT03_TMR1)
@@ -799,6 +799,8 @@ DRAW_BOARD
                 .xl
                 LDX #START_BOARD
                 STX CURSORPOS
+                LDA #$B5
+                STA CURSORPOS + 2
                 
                 LDX #0
                 LDA #0
@@ -819,6 +821,11 @@ DRAW_BOARD
                 STA [CURSORPOS]
                 INX 
                 INC CURSORPOS
+                ; each tile is 16 bits - the second byte is tileset0 and lut0
+                LDA #0
+                STA [CURSORPOS]
+                INC CURSORPOS
+                
                 LDA BOARDX
                 INC A
                 STA BOARDX
@@ -828,7 +835,7 @@ DRAW_BOARD
                 setal
                 LDA CURSORPOS
                 CLC
-                ADC #$40-BOARD_WIDTH
+                ADC #($40-BOARD_WIDTH) * 2
                 STA CURSORPOS
                 setas
                 LDA BOARDY
@@ -840,12 +847,15 @@ DRAW_BOARD
 
 DRAW_PIECE
                 .as
+                LDA #$B5
+                STA CURSORPOS + 2
                 setal
                 LDA #START_BOARD
                 CLC
                 ADC PIECE_X
+                ADC PIECE_X ; multiply by 2
                 STA CURSORPOS
-                LDA #64
+                LDA #128 ; each tile is 16-bits
                 STA UNSIGNED_MULT_A
                 LDA PIECE_Y
                 STA UNSIGNED_MULT_B
@@ -877,6 +887,9 @@ DRAW_PIECE
         SKIP_DRAW
                 INX
                 INC CURSORPOS
+                LDA #0
+                STA [CURSORPOS]
+                INC CURSORPOS
                 TXA
                 AND #3
                 BNE DP_NEXT_PIECE_SYMBOL
@@ -884,7 +897,7 @@ DRAW_PIECE
                 setal
                 LDA CURSORPOS
                 CLC
-                ADC #$40-4
+                ADC #($40-4) * 2
                 STA CURSORPOS
                 TXA
                 AND #$F
@@ -895,8 +908,10 @@ DRAW_PIECE
                 
 DRAW_NEXT_PIECE
                 .as
-                LDY #$A000 + $80 * 16 + 56
+                LDY #$A000 + COLUMNS_PER_LINE * 16 + 56
                 STY CURSORPOS
+                LDA #$AF
+                STA CURSORPOS + 2
                 LDA #$20
                 STA CURCOLOR
                 
@@ -906,6 +921,8 @@ DRAW_NEXT_PIECE
                 
                 LDX #NEXT_PIECE_LOC
                 STX CURSORPOS
+                LDA #$B5
+                STA CURSORPOS + 2
                 
                 LDA #0
                 XBA
@@ -930,6 +947,9 @@ DRAW_NEXT_PIECE
                 
                 INX
                 INC CURSORPOS
+                LDA #0
+                STA [CURSORPOS]
+                INC CURSORPOS
                 TXA
                 AND #3
                 BNE DNP_NEXT_PIECE_SYMBOL
@@ -937,7 +957,7 @@ DRAW_NEXT_PIECE
                 setal
                 LDA CURSORPOS
                 CLC
-                ADC #$40-4
+                ADC #($40-4) * 2
                 STA CURSORPOS
                 TXA
                 AND #$F
@@ -950,6 +970,8 @@ DRAW_SCORE
                 .as
                 LDY #$A000 + COLUMNS_PER_LINE * 5 + 56
                 STY CURSORPOS
+                LDA #$AF
+                STA CURSORPOS + 2
                 LDA #$20
                 STA CURCOLOR
                 
@@ -972,6 +994,8 @@ DRAW_HI_SCORES
                 ; display "HI SCORES:"
                 LDY #$A000 + COLUMNS_PER_LINE * 5 + 3
                 STY CURSORPOS
+                LDA #$AF
+                STA CURSORPOS + 2
                 LDA #$20
                 STA CURCOLOR
                 
@@ -1014,10 +1038,10 @@ DRAW_HI_SCORES
                 ADC #<>HI_SCORES
                 STA MSG_ADDR
                 
+                ; calculate the position to write to
                 LDA CURSORPOS
-                AND #$FF80 ; each line is 128 characters
                 CLC
-                ADC #$83
+                ADC #COLUMNS_PER_LINE - 13 ; name is 6+1 and score is 3 * 2 chars = 13
                 STA CURSORPOS
                 
                 ; if the score is not zero, then display the name and score
@@ -1030,6 +1054,8 @@ DRAW_LEVEL
                 .as
                 LDY #$A000 + COLUMNS_PER_LINE * 7 + 56
                 STY CURSORPOS
+                LDA #$AF
+                STA CURSORPOS + 2
                 LDA #$20
                 STA CURCOLOR
                 
@@ -1048,8 +1074,10 @@ DRAW_LEVEL
                 
 DRAW_LINES
                 .as
-                LDY #$A000 + $80 * 13 + 56
+                LDY #$A000 + COLUMNS_PER_LINE * 13 + 56
                 STY CURSORPOS
+                LDA #$AF
+                STA CURSORPOS + 2
                 LDA #$20
                 STA CURCOLOR
                 
@@ -1078,8 +1106,10 @@ REMOVE_LINES_LOOP
                 BNE WAIT_FOR_50
                 
                 ; display bonus message
-                LDY #$A000 + $80 * 11 + 56
+                LDY #$A000 + COLUMNS_PER_LINE * 11 + 56
                 STY CURSORPOS
+                LDA #$AF
+                STA CURSORPOS + 2
                 LDA #$20
                 STA CURCOLOR
                 
@@ -1103,7 +1133,7 @@ REMOVE_LINES_LOOP
                 BNE SKIP_DELETE_LINES
                 
                 ; delete the bonus line
-                LDY #$A000 + $80 * 11 + 56
+                LDY #$A000 + COLUMNS_PER_LINE * 11 + 56
                 STY CURSORPOS
                 LDA #0
                 LDY #0
@@ -1203,8 +1233,9 @@ GAME_OVER
                 LDA #$30
                 STA GAME_OVER_TIMER
                 
-                LDA #$2 ; disable the tiles
+                LDA #$0 ; disable the tiles
                 STA TL0_CONTROL_REG
+                STA TL1_CONTROL_REG
                 
                 ; load the game over music
                 LDA #`VGM_GAME_OVER_MUSIC
@@ -1219,6 +1250,8 @@ GAME_OVER
                 JSL CLRSCREEN
                 LDY #$A000 + COLUMNS_PER_LINE*26 + 31
                 STY CURSORPOS
+                LDA #$AF
+                STA CURSORPOS + 2
                 LDA #$23
                 STA CURCOLOR
                 ; display GAME OVER
@@ -1310,6 +1343,8 @@ DISPLAY_COUNTDOWN
                 ; display RESTART
                 LDY #$A000 + COLUMNS_PER_LINE*29 + 29
                 STY CURSORPOS
+                LDA #$AF
+                STA CURSORPOS + 2
                 LDA #$20
                 STA CURCOLOR
                 
@@ -1444,6 +1479,12 @@ LOAD_GAME_ASSETS
                 LDA #0
                 STA TILESET0_ADDY_L ; offset of the tileset 0 is B0:0000
                 
+                ; load tiles
+                LDA #$1000
+                LDX #<>TILES
+                LDY #0
+                MVN `TILES,$B0
+                
                 ; load tile palette
                 LDA #$400
                 LDX #<>PALETTE
@@ -1461,10 +1502,12 @@ LOAD_GAME_ASSETS
                 LDX #<>BACKGROUND
                 LDY #$0
                 MVN `BACKGROUND,$B1
+                
                 LDA #$FFFF
                 LDX #<>BACKGROUND
                 LDY #0
                 MVN `BACKGROUND+$10000,$B2
+                
                 LDA #$FFFF
                 LDX #<>BACKGROUND
                 LDY #0
@@ -1475,27 +1518,29 @@ LOAD_GAME_ASSETS
                 LDY #0
                 MVN `BACKGROUND+$30000,$B4
                 
-                LDA #$AFFF
+                LDA #$FFFF
                 LDX #<>BACKGROUND
                 LDY #0
                 MVN `BACKGROUND+$40000,$B5
                 
-                ; load tiles
-                LDA #$1000
-                LDX #<>TILES
-                LDY #0
-                MVN `TILES,$B0
+                
                 
                 setas
                 PLB ; MVN operations set the bank - so we need to reset
-                
+                ; disable tile layer 1
+                LDA #0
+                STA TL1_CONTROL_REG
                 ; enable tile layer 0
                 LDA #$1
                 STA TL0_CONTROL_REG
                 STA BM1_START_ADDY_H ; start at $b1:0000
 
-                LDA #$3  ; enable bitmap with LUT 2
+                ; enable bitmap 1, with LUT 1
+                LDA #$3
                 STA BM1_CONTROL_REG
+                ; disable bitmap 0
+                LDA #0
+                STA BM0_CONTROL_REG
                 
                 
                 RTS
@@ -1542,11 +1587,11 @@ INIT_GAME
                 STA @lINT_MASK_REG3
                 
                 JSR CLEAR_TILESET
-                LDA #$1
-                STA TL0_CONTROL_REG
                 
-                LDA #$0 ; we're using a 256 stride
-                STA TL1_CONTROL_REG
+                LDA #$1
+                STA TL0_CONTROL_REG ; enable the board tiles
+                LDA #$0
+                STA TL1_CONTROL_REG ; disable the intro tiles
                 
                 ; load the play music
                 LDA #`VGM_PLAY_MUSIC
@@ -1613,9 +1658,9 @@ INTRO_LOOP
                 RTS
 DISPLAY_INTRO
                 .as
-                
+                ; disable layer 0
                 LDA #0
-                STA TL0_CONTROL_REG
+                STA TL0_CONTROL_REG 
                 
                 ; load the intro music
                 LDA #`VGM_INTRO_MUSIC
@@ -1678,7 +1723,7 @@ DISPLAY_INTRO
                 BNE IT_LOOP
                 
                 ; enable tile layer 1
-                LDA #$1 ; we're using a 256 stride
+                LDA #$1
                 STA TL1_CONTROL_REG
                 RTS
                 

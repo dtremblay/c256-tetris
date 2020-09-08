@@ -130,14 +130,12 @@ KEYBOARD_INTERRUPT
                 
                 ; ERASE the ENTRY text
                 setxl
-                LDY #$A000 + 128*32 + 24
+                LDY #$A000 + COLUMNS_PER_LINE*32 + 24
                 STY CURSORPOS
                 
-                LDY #4 ; delete 7 lines
+                LDY #7 ; delete 7 lines
         ER_NEXT_LINE
-                LDX #128 + 40 ; the number of characters to delete
-                LDA #24
-                STA CURSORPOS
+                LDX #30 ; the number of characters to delete
                 LDA #0
                 
         ERASE_ENTRY_LOOP
@@ -146,7 +144,13 @@ KEYBOARD_INTERRUPT
                 DEX
                 BNE ERASE_ENTRY_LOOP
                 
-                INC CURSORPOS+1
+                setal
+                LDA CURSORPOS
+                CLC
+                ADC #COLUMNS_PER_LINE - 30
+                STA CURSORPOS
+                setas
+                
                 DEY
                 BNE ER_NEXT_LINE
                 
@@ -235,8 +239,10 @@ SOF_INTERRUPT
                 BNE SOF_DONE
                 
                 ; write the user entry
-                LDY #$A000 + 128*32 + 40
+                LDY #$A000 + COLUMNS_PER_LINE * 32 + 40
                 STY CURSORPOS
+                LDA #$AF
+                STA CURSORPOS + 2
                 LDA #$23
                 STA CURCOLOR
                 
