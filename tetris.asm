@@ -51,8 +51,8 @@ LEVEL           .byte 1
 INITIAL_GAME_SPEED = 40
 BOARD_WIDTH     = 14
 BOARD_HEIGHT    = 21
-START_BOARD     = (1 + $40 * 5 + (40-BOARD_WIDTH)/2) * 2
-NEXT_PIECE_LOC  = (1 + $40 *11 + 31) * 2
+START_BOARD     = (1 + $40 * 5 + (40-BOARD_WIDTH)/2) * 2 + <>TL_MAP_0_ADDR
+NEXT_PIECE_LOC  = (1 + $40 *11 + 31) * 2 + <>TL_MAP_0_ADDR
 PIECE_VALUE     = $25  ; we're doing BCD additions
 
 EFFECT_T_POSITION = $60 ; 4 bytes
@@ -97,6 +97,12 @@ LOOP_OFFSET_REG   = $8E ; 2 bytes
 ; TEMPORARY MEMORY LOCATION
 TEMP_LOCATION     = $90 ; 2 bytes
 HISCORE_OFFSET    = $92 ; 1 byte
+
+TILESET_ADDR    = $B00000
+TL_MAP_0_ADDR   = $B01000
+TL_MAP_1_ADDR   = $B01800
+BACKGROUND_ADDR = $B10000
+
 
 GAME_START      
                 setas
@@ -799,7 +805,7 @@ DRAW_BOARD
                 .xl
                 LDX #START_BOARD
                 STX CURSORPOS
-                LDA #$B5
+                LDA #`TL_MAP_0_ADDR
                 STA CURSORPOS + 2
                 
                 LDX #0
@@ -847,7 +853,7 @@ DRAW_BOARD
 
 DRAW_PIECE
                 .as
-                LDA #$B5
+                LDA #`TL_MAP_0_ADDR
                 STA CURSORPOS + 2
                 setal
                 LDA #START_BOARD
@@ -921,7 +927,7 @@ DRAW_NEXT_PIECE
                 
                 LDX #NEXT_PIECE_LOC
                 STX CURSORPOS
-                LDA #$B5
+                LDA #`TL_MAP_0_ADDR
                 STA CURSORPOS + 2
                 
                 LDA #0
@@ -1442,6 +1448,9 @@ DELETE_LINES
                 PLB
                 RTS
 
+; we're using two tilemaps: 0 is the game board, 1 is the intro "C256 Foenix"
+; the tileset is the same for both tilemaps.  Stored at B0:0000
+; the 
 LOAD_GAME_ASSETS
                 .as
                 PHB
@@ -1450,25 +1459,33 @@ LOAD_GAME_ASSETS
                 STA MASTER_CTRL_REG_L
                 
                 ; set the tilemap addresses
-                LDA #$5
-                STA TL0_START_ADDY_H
-                STA TL1_START_ADDY_H
                 LDA #0
-                STA TILESET0_ADDY_L + 2 ; tileset offset
-                LDA #$8
+                STA TL0_START_ADDY_H ; addresses are offset by $B0:0000
+                STA TL1_START_ADDY_H
+                STA TILESET0_ADDY_H  ; tileset offset
+                STA BM0_CONTROL_REG  ; disable bitmap 0
+                LDA #(`BACKGROUND_ADDR - $B00000)
+                STA BM1_START_ADDY_H ; start at $b1:0000
+                LDA #8
                 STA TILESET0_ADDY_CFG ; set stride to 256
                 STA TILESET1_ADDY_CFG ; set stride to 256
                 
                 setal
-                LDA #$0
-                STA TL0_START_ADDY_L
+                LDA #0
+                STA BM1_START_ADDY_L ; B1:0000
                 STA TL0_WINDOW_X_POS_L
                 STA TL0_WINDOW_Y_POS_L
                 STA TL1_WINDOW_X_POS_L
                 STA TL1_WINDOW_Y_POS_L
+                STA TILESET0_ADDY_L ; offset of the tileset 0 is B0:0000
                 
-                LDA #$800
+                ; base addresses for tilemaps
+                LDA #<>TL_MAP_0_ADDR
+                STA TL0_START_ADDY_L
+                LDA #<>TL_MAP_1_ADDR
                 STA TL1_START_ADDY_L
+                
+                ; both tilemaps are 64 x 32
                 LDA #64
                 STA TL0_TOTAL_X_SIZE_L
                 STA TL1_TOTAL_X_SIZE_L
@@ -1476,26 +1493,23 @@ LOAD_GAME_ASSETS
                 STA TL0_TOTAL_Y_SIZE_L
                 STA TL1_TOTAL_Y_SIZE_L
                 
-                LDA #0
-                STA TILESET0_ADDY_L ; offset of the tileset 0 is B0:0000
-                
                 ; load tiles
                 LDA #$1000
-                LDX #<>TILES
-                LDY #0
-                MVN `TILES,$B0
+                LDX #<>TILESET
+                LDY #<>TILESET_ADDR
+                MVN `TILESET,`TILESET_ADDR ; B0:0000
                 
                 ; load tile palette
                 LDA #$400
                 LDX #<>PALETTE
                 LDY #<>GRPH_LUT0_PTR
-                MVN #`PALETTE,#`GRPH_LUT0_PTR
+                MVN #`PALETTE,#`GRPH_LUT0_PTR ; PALETTE LUT 0 AF:2000
                 
                 ; load background palette
                 LDA #$400
                 LDX #<>BACKGROUND_PAL
                 LDY #<>GRPH_LUT1_PTR
-                MVN #`BACKGROUND_PAL,#`GRPH_LUT1_PTR
+                MVN #`BACKGROUND_PAL,#`GRPH_LUT1_PTR; PALETTE LUT 1 AF:2400
                 
                 ; load background image - need 4 x 64k moves
                 LDA #$FFFF
@@ -1518,12 +1532,10 @@ LOAD_GAME_ASSETS
                 LDY #0
                 MVN `BACKGROUND+$30000,$B4
                 
-                LDA #$FFFF
+                LDA #$AFFF
                 LDX #<>BACKGROUND
                 LDY #0
                 MVN `BACKGROUND+$40000,$B5
-                
-                
                 
                 setas
                 PLB ; MVN operations set the bank - so we need to reset
@@ -1533,14 +1545,10 @@ LOAD_GAME_ASSETS
                 ; enable tile layer 0
                 LDA #$1
                 STA TL0_CONTROL_REG
-                STA BM1_START_ADDY_H ; start at $b1:0000
 
                 ; enable bitmap 1, with LUT 1
                 LDA #$3
                 STA BM1_CONTROL_REG
-                ; disable bitmap 0
-                LDA #0
-                STA BM0_CONTROL_REG
                 
                 
                 RTS
@@ -1627,9 +1635,9 @@ INTRO_LOOP
                 LDX #0
                 
                 ; prepare to copy bytes from mem to video ram
-                LDA #$B5
+                LDA #`TL_MAP_1_ADDR
                 STA CURSORPOS + 2
-                LDY #$0800
+                LDY #<>TL_MAP_1_ADDR
                 STY CURSORPOS
                 LDX #0
                 LDY #0
@@ -1705,9 +1713,9 @@ DISPLAY_INTRO
                 STA INTRO_SLIDE_CNT
                 
                 ; prepare to copy bytes from mem to video ram
-                LDA #$B5
+                LDA #`TL_MAP_1_ADDR
                 STA CURSORPOS + 2
-                LDY #$0800
+                LDY #<>TL_MAP_1_ADDR
                 STY CURSORPOS
                 LDX #0
                 LDY #0
@@ -1730,9 +1738,9 @@ DISPLAY_INTRO
 CLEAR_TILESET   
                 .as
                 ; clear the tileset - address is B5:0000 in Video RAM
-                LDX #$0
+                LDX #<>TL_MAP_0_ADDR
                 STX CURSORPOS
-                LDA #$B5
+                LDA #`TL_MAP_0_ADDR
                 STA CURSORPOS + 2
                 LDA #0
                 LDY #0
@@ -1972,7 +1980,7 @@ MODIFIED_TIME       .word ?             ; The modification time of the file
 
 tetris_scr .dstruct FILEDESC
 
-TILES
+TILESET
 .binary "tetris-tiles.data"
 BACKGROUND_PAL
 .binary "background.data.pal"
