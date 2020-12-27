@@ -125,11 +125,13 @@ KEYBOARD_INTERRUPT
                 BRA ENTER_KEY
                 
         E_K_DONE
+                setxl
+                JSR SAVE_HI_SCORES
+                
                 LDA #GS_GAME_OVER
                 STA GAME_STATE
                 
                 ; ERASE the ENTRY text
-                setxl
                 LDY #$A000 + COLUMNS_PER_LINE*32 + 24
                 STY CURSORPOS
                 

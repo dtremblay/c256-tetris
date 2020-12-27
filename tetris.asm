@@ -119,13 +119,7 @@ GAME_START
                 STA GABE_RNG_SEED_LO ; set the max value from 0 to 6
                 STA PIECE_X
                 
-                ; test the hi score is working
-                ;LDA #0 ; test hiscore
-                ;STA SCORE + 2 ; test hiscore
-                ;LDA #$3175 ; this score should be at the top
-                ;STA SCORE ; test hiscore
                 setas
-                ;JSR CHECK_SCORE ; test hiscore
                 
                 JSR LOAD_GAME_ASSETS
                 JSR LOAD_HI_SCORES
@@ -1765,6 +1759,9 @@ LOAD_HI_SCORES
                 LDA #<>SCORE_PATH
                 STA tetris_scr.PATH
                 setas
+                LDA #2
+                STA tetris_scr.DEV
+                
                 LDA #`tetris_scr
                 STA DOS_FD_PTR + 2
                 LDA #`SCORE_PATH
@@ -1773,9 +1770,17 @@ LOAD_HI_SCORES
                 JSL F_OPEN
                 ; check if there was an error
                 LDA tetris_scr.STATUS
-                BNE LHS_DONE
+                BCC LHS_DONE
                 
                 ; if no errors, copy 100 bytes from the read sector to hi_scores area
+                LDX #0
+    LHS_LOOP
+                LDA tetris_scr.BUFFER,X
+                STA HI_SCORES,X
+                INX
+                CPX #100
+                BNE LHS_LOOP
+                
     LHS_DONE
                 RTS
                 
@@ -1786,6 +1791,33 @@ LOAD_HI_SCORES
 ; *****************************************************************************
 SAVE_HI_SCORES
                 .as
+                setal
+                LDA #<>tetris_scr
+                STA DOS_FD_PTR
+                
+                LDA #<>SCORE_PATH
+                STA tetris_scr.PATH
+                
+                LDA #100
+                STA tetris_scr.SIZE
+                LDA #0
+                STA tetris_scr.SIZE + 2
+                
+                LDA #<>HI_SCORES
+                STA tetris_scr.BUFFER
+                LDA #`HI_SCORES
+                STA tetris_scr.BUFFER + 2
+                setas
+                LDA #2
+                STA tetris_scr.DEV
+                
+                LDA #`tetris_scr
+                STA DOS_FD_PTR + 2
+                LDA #`SCORE_PATH
+                STA tetris_scr.PATH + 2
+                
+                JSL F_WRITE
+                
                 RTS
                 
 ; *****************************************************************************
@@ -1960,7 +1992,7 @@ HI_SCORES
     .byte $86,$24,$00 ; little-endian
 .rept 9
     .fill 6, $20   ; only 6 characters for the name, null terminated
-    .fill 4, 0    ; BCD encoded score
+    .fill 4, 0     ; BCD encoded score
 .next
 
 ; File Descriptor -- Used as parameter for higher level DOS functions
