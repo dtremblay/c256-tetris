@@ -1758,6 +1758,9 @@ LOAD_HI_SCORES
                 
                 LDA #<>SCORE_PATH
                 STA tetris_scr.PATH
+                
+                LDA #<>HI_SCORES
+                STA tetris_scr.BUFFER
                 setas
                 LDA #2
                 STA tetris_scr.DEV
@@ -1766,20 +1769,15 @@ LOAD_HI_SCORES
                 STA DOS_FD_PTR + 2
                 LDA #`SCORE_PATH
                 STA tetris_scr.PATH + 2
+                LDA #`HI_SCORES
+                STA tetris_scr.BUFFER + 2
                 
                 JSL F_OPEN
                 ; check if there was an error
-                LDA tetris_scr.STATUS
-                BCC LHS_DONE
+                BCS LHS_DONE
                 
-                ; if no errors, copy 100 bytes from the read sector to hi_scores area
-                LDX #0
-    LHS_LOOP
-                LDA tetris_scr.BUFFER,X
-                STA HI_SCORES,X
-                INX
-                CPX #100
-                BNE LHS_LOOP
+                ; if the file didn't exist, create it
+                ; JSL F_CREATE
                 
     LHS_DONE
                 RTS
