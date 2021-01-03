@@ -1772,13 +1772,30 @@ LOAD_HI_SCORES
                 LDA #`HI_SCORES
                 STA tetris_scr.BUFFER + 2
                 
+                LDA #100
+                STA tetris_scr.SIZE
+                LDA #0
+                STA tetris_scr.SIZE + 2
+                
                 JSL F_OPEN
                 ; check if there was an error
                 BCS LHS_DONE
                 
-                ; if the file didn't exist, create it
-                ; JSL F_CREATE
+                LDA DOS_STATUS
+                CMP #4
+                BEQ LHS_DONE
                 
+                ; if the file didn't exist, create it
+                JSL F_CREATE
+                BCC LHS_DONE
+                
+                ;now copy the cluster to current
+                setal
+                LDA tetris_scr.FIRST_CLUSTER
+                STA tetris_scr.CLUSTER
+                LDA tetris_scr.FIRST_CLUSTER + 2
+                STA tetris_scr.CLUSTER + 2
+                setas
     LHS_DONE
                 RTS
                 
@@ -1789,6 +1806,9 @@ LOAD_HI_SCORES
 ; *****************************************************************************
 SAVE_HI_SCORES
                 .as
+                LDA DOS_STATUS
+                BNE SHS_DONE
+                
                 setal
                 LDA #<>tetris_scr
                 STA DOS_FD_PTR
@@ -1815,7 +1835,7 @@ SAVE_HI_SCORES
                 STA tetris_scr.PATH + 2
                 
                 JSL F_WRITE
-                
+    SHS_DONE
                 RTS
                 
 ; *****************************************************************************

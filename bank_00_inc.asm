@@ -103,16 +103,64 @@ BLOCK_ADDR       = $00030F ;2 Bytes (temp) Address of block being loaded
 BLOCK_BANK       = $000311 ;1 Byte  (temp) Bank of block being loaded
 BLOCK_COUNT      = $000312 ;2 Bytes (temp) Counter of bytes read as file is loaded
 
-; $00:0320 to $00:06FF - Reserved for CH376S SDCard Controller
-SDOS_LINE_SELECT = $00031F ; used by the file menu to track which item is selected (0-37)
+; Floppy drive code variables
+FDC_DRIVE        = $000300 ;1 byte - The number of the selected drive
+FDC_HEAD         = $000301 ;1 byte - The head number (0 or 1)
+FDC_CYLINDER     = $000302 ;1 byte - The cylinder number
+FDC_SECTOR       = $000303 ;1 byte - The sector number
+FDC_SECTOR_SIZE  = $000304 ;1 byte - The sector size code (2 = 512)
+FDC_SECPERTRK    = $000305 ;1 byte - The number of sectors per track (18 for 1.44 MB floppy)
+FDC_ST0          = $000306 ;1 byte - Status Register 0
+FDC_ST1          = $000307 ;1 byte - Status Register 1
+FDC_ST2          = $000308 ;1 byte - Status Register 2
+FDC_ST3          = $000309 ;1 byte - Status Register 3
+FDC_PCN          = $00030A ;1 byte - Present Cylinder Number
+FDC_STATUS       = $00030B ;1 byte - Status of what we think is going on with the FDC:
+                           ;    $80 = motor is on
 
+DIVIDEND         = $00030C ;4 bytes - Dividend for 32-bit division
+DIVISOR          = $000310 ;4 bytes - Divisor for 32-bit division
+REMAINDER        = $000314 ;4 bytes - Remainder for 32-bit division
 
-; TODO - Fix the following - do we really need them?
-SDOS_BYTE_NUMBER = $00032C ; Number of Byte to Read or Write before changing the Pointer
+; $00:0320 to $00:06FF - Reserved for block device access and FAT file system support
 
-SDOS_BYTE_PTR    = $000334
+; Low-level (BIOS) sector access variables
+SDOS_VARIABLES   = $000320
+BIOS_STATUS      = $000320      ; 1 byte - Status of any BIOS operation
+BIOS_DEV         = $000321      ; 1 byte - Block device number for block operations
+BIOS_LBA         = $000322      ; 4 bytes - Address of block to read/write (this is the physical block, w/o reference to partition)
+BIOS_BUFF_PTR    = $000326      ; 4 bytes - 24-bit pointer to memory for read/write operations
+BIOS_FIFO_COUNT  = $00032A      ; 2 bytes - The number of bytes read on the last block read
+BIOS_FLAGS       = $00032C      ; 1 byte - Flags for various BIOSy things:
+                                ; $80 = time out flag: if set, a timeout has occurred (see ISETTIMEOUT)
+BIOS_TIMER       = $00032D      ; 1 byte - the number of 1/60 ticks for a time out
+
+; FAT (cluster level) access
+DOS_STATUS       = $00032E      ; 1 byte - The error code describing any error with file access
+DOS_CLUS_ID      = $000330      ; 4 bytes - The cluster desired for a DOS operation
+DOS_DIR_PTR      = $000338      ; 4 bytes - Pointer to a directory entry (assumed to be within DOS_SECTOR)
+DOS_BUFF_PTR     = $00033C      ; 4 bytes - A pointer for DOS cluster read/write operations
 DOS_FD_PTR       = $000340      ; 4 bytes - A pointer to a file descriptor
-SDOS_FILE_NAME   = $000380 ; // Max of 128 Chars for the file path
+DOS_FAT_LBA      = $000344      ; 4 bytes - The LBA for a sector of the FAT we need to read/write
+DOS_TEMP         = $000348      ; 4 bytes - Temporary storage for DOS operations
+DOS_FILE_SIZE    = $00034C      ; 4 bytes - The size of a file
+DOS_SRC_PTR      = $000350      ; 4 bytes - Pointer for transferring data
+DOS_DST_PTR      = $000354      ; 4 bytes - Pointer for transferring data
+DOS_END_PTR      = $000358      ; 4 bytes - Pointer to the last byte to save
+DOS_RUN_PTR      = $00035C      ; 4 bytes - Pointer for starting a loaded program
+DOS_RUN_PARAM    = $000360      ; 4 bytes - Pointer to the ASCIIZ string for arguments in loading a program
+DOS_STR1_PTR     = $000364      ; 4 bytes - pointer to a string
+DOS_STR2_PTR     = $000368      ; 4 bytes - pointer to a string
+DOS_SCRATCH      = $00036B      ; 4 bytes - general purpose short term storage
+
+DOS_PATH_BUFF    = $000400      ; 256 bytes - A buffer for path names
+
+FDC_PARAMETERS   = $000500      ; 16 bytes - a buffer of parameter data for the FDC
+FDC_RESULTS      = $000510      ; 16 bytes - Buffer for results of FDC commands
+FDC_PARAM_NUM    = $000530      ; 1 byte - The number of parameters to send to the FDC (including command)
+FDC_RESULT_NUM   = $000532      ; 1 byte - The number of results expected
+FDC_EXPECT_DAT   = $000533      ; 1 byte - 0 = the command expects no data, otherwise expects data
+FDC_CMD_RETRY    = $000534      ; 1 byte - a retry counter for commands
 
 ; COMMAND PARSER Variables
 ; Command Parser Stuff between $000F00 -> $000F84 (see CMD_Parser.asm)
