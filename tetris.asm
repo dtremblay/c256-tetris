@@ -25,6 +25,8 @@
 * = $160000
 .include "interrupt_handler.asm"
 
+TARGET_FMX       = 1
+TARGET_U         = 2
 COLUMNS_PER_LINE = 80
 TICK_COUNT      .byte 0
 BOARDX          .byte 0
@@ -1599,6 +1601,7 @@ INIT_GAME
                 LDA #`VGM_PLAY_MUSIC
                 STA CURRENT_POSITION + 2
                 STA SONG_START + 2
+                
                 setal
                 LDA #<>VGM_PLAY_MUSIC
                 STA SONG_START
@@ -2036,6 +2039,8 @@ BACKGROUND_PAL
 .binary "background.data.pal"
 PALETTE
 .binary "tetris-tiles.data.pal"
+INTRO_TILESET
+.binary "title-tiles.data"
 
 VGM_EFFECT_DROP
 VGM_EFFECT_ROTATE
@@ -2043,17 +2048,27 @@ VGM_EFFECT_ROTATE
 VGM_EFFECT_LINE
 .binary "bar.vgm"
 
-VGM_INTRO_MUSIC
-;.binary "music/02 Strolling Player.vgm"
-.binary "music/01 Peddler.vgm"
-VGM_PLAY_MUSIC
-.binary "music/05 Troika.vgm"
-VGM_GAME_OVER_MUSIC
-.binary "music/04 Kalinka.vgm"
 
-INTRO_TILESET
-.binary "title-tiles.data"
+.if TARGET_SYS == TARGET_FMX
+    VGM_INTRO_MUSIC
+        ;.binary "music/02 Strolling Player YM2151.vgm"
+        .binary "music/01 Peddler YM2151.vgm"
+    VGM_PLAY_MUSIC
+        .binary "music/05 Troika YM2151.vgm"
+    VGM_GAME_OVER_MUSIC
+        .binary "music/04 Kalinka YM2151.vgm"
+.elsif TARGET_SYS = TARGET_U
+    VGM_INTRO_MUSIC
+        .binary "music/06 Stage 2, 3 Boss, Stage 5 YMF262.vgm"
+    ;* = $17bf26
+    VGM_PLAY_MUSIC
+        .binary "music/07 Stage 3 YM262.vgm"
+    ;* = $18b8b8
+    VGM_GAME_OVER_MUSIC
+        .binary "music/07 Player's Turn YM262.vgm"
+.fi
 
-* = $170000
+
+* = $1A0000
 BACKGROUND
 .binary "background.data"

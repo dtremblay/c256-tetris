@@ -32,13 +32,19 @@ GABE_RNG_CTRL_DV    = $02     ; After Setting the Seed Value, Toggle that Bit fo
 GABE_SYS_STAT       = $AFE887 ;
 GABE_SYS_STAT_MID0  = $01     ; Machine ID -- LSB
 GABE_SYS_STAT_MID1  = $02     ; Machine ID -- MSB
+GABE_SYS_STAT_MID2  = $04     ; Machine ID -- MSB
+
 GABE_SYS_STAT_EXP   = $08     ; if Zero, there is an Expansion Card Preset
 GABE_SYS_STAT_CPUA  = $40     ; Indicates the (8bit/16bit) Size of the Accumulator
 GABE_SYS_STAT_CPUX  = $80     ; Indicates the (8bit/16bit) Size of the Accumulator
 
 
-; Machine ID
-; $00 = FMX - Development Platform
-; $01 = C256 Foenix - Dev Platform
-; $10 = C256 Foenix - User Version (65C816)
-; $11 = TBD
+;Bit 2, Bit 1, Bit 0
+;$000: FMX
+;$100: FMX (Future C5A)
+;$001: U 2Meg
+;$101: U+ 4Meg U+
+;$010: TBD (Reserved)
+;$110: TBD (Reserved)
+;$011: A2560 Dev
+;$111: A2560 Keyboard
