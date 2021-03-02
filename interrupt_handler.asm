@@ -70,7 +70,7 @@ KEYBOARD_INTERRUPT
                 
                 setxs
     MORE_KEYS
-                LDA KBD_INPT_BUF        ; Get Scan Code from KeyBoard
+                LOAD_KBD_INPT_BUF        ; Get Scan Code from KeyBoard
                 CMP #$7F
                 BGE DONT_REACT
                 TAX
@@ -177,10 +177,11 @@ SOF_INTERRUPT
                 .as
                 ; empty the keyboard buffer, just in case
         EMPTY_KBD_BUFFER
-                LDA @lSTATUS_PORT
+                LOAD_KBD_STATUS_PORT
+                
                 BIT #1
                 BEQ GS_KBD_NOT_FULL
-                LDA KBD_INPT_BUF
+                LOAD_KBD_INPT_BUF
                 BRA EMPTY_KBD_BUFFER
         GS_KBD_NOT_FULL
                 
@@ -308,7 +309,7 @@ MOUSE_INTERRUPT .as
                 LDA @lINT_PENDING_REG0
                 AND #FNX0_INT07_MOUSE
                 STA @lINT_PENDING_REG0
-                LDA KBD_INPT_BUF
+                LOAD_KBD_INPT_BUF
                 LDX #$0000
                 setxs
                 LDX MOUSE_PTR

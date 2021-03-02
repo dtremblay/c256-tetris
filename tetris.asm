@@ -124,8 +124,8 @@ GAME_START
                 setas
                 
                 JSR LOAD_GAME_ASSETS
+                JSR ISDOS_INIT
                 JSR LOAD_HI_SCORES
-                
                 LDA #GS_INTRO
                 ;LDA #GS_NAME_ENTRY ; test hiscore
                 STA GAME_STATE
@@ -1490,19 +1490,19 @@ LOAD_GAME_ASSETS
                 STA TL1_TOTAL_Y_SIZE_L
                 
                 ; load tiles
-                LDA #$1000
+                LDA #$1000-1
                 LDX #<>TILESET
                 LDY #<>TILESET_ADDR
                 MVN `TILESET,`TILESET_ADDR ; B0:0000
                 
                 ; load tile palette
-                LDA #$400
+                LDA #$400-1
                 LDX #<>PALETTE
                 LDY #<>GRPH_LUT0_PTR
                 MVN #`PALETTE,#`GRPH_LUT0_PTR ; PALETTE LUT 0 AF:2000
                 
                 ; load background palette
-                LDA #$400
+                LDA #$400-1
                 LDX #<>BACKGROUND_PAL
                 LDY #<>GRPH_LUT1_PTR
                 MVN #`BACKGROUND_PAL,#`GRPH_LUT1_PTR; PALETTE LUT 1 AF:2400
@@ -1532,6 +1532,11 @@ LOAD_GAME_ASSETS
                 LDX #<>BACKGROUND
                 LDY #0
                 MVN `BACKGROUND+$40000,$B5
+                
+                LDA #$800-1
+                LDX #<>FONTSET
+                LDY #<>FONT_MEMORY_BANK0
+                MVN `FONTSET,`FONT_MEMORY_BANK0
                 
                 setas
                 PLB ; MVN operations set the bank - so we need to reset
@@ -1754,7 +1759,10 @@ CLEAR_TILESET
 ; *****************************************************************************
 LOAD_HI_SCORES
                 .as
-                ; check if the sd card is present
+                
+                LDA SDCARD_PRSNT_MNT
+                BEQ LHS_DONE
+                
                 setal
                 LDA #<>tetris_scr
                 STA DOS_FD_PTR
@@ -1809,8 +1817,8 @@ LOAD_HI_SCORES
 ; *****************************************************************************
 SAVE_HI_SCORES
                 .as
-                LDA DOS_STATUS
-                BNE SHS_DONE
+                LDA SDCARD_PRSNT_MNT
+                BEQ SHS_DONE
                 
                 setal
                 LDA #<>tetris_scr
@@ -1929,6 +1937,7 @@ CHECK_SCORE
 
 .include "vgm_player.asm"
 .include "vgm_effect.asm"
+.include "SDOS.asm"
 
 ; *****************************************************************************
 ; * variables
@@ -2041,6 +2050,8 @@ PALETTE
 .binary "tetris-tiles.data.pal"
 INTRO_TILESET
 .binary "title-tiles.data"
+FONTSET
+.binary "tetris-font.bin"
 
 VGM_EFFECT_DROP
 VGM_EFFECT_ROTATE

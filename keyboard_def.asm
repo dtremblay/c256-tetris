@@ -1,21 +1,10 @@
-;
-.if TARGET_SYS == TARGET_FMX
-    STATUS_PORT        = $AF1064
-    KBD_CMD_BUF        = $AF1064
-    KBD_OUT_BUF        = $AF1060
-    KBD_INPT_BUF       = $AF1060
-    KBD_DATA_BUF       = $AF1060
-    PORT_A             = $AF1060
-    PORT_B             = $AF1061
-.else
-    STATUS_PORT        = $AF1807
-    KBD_CMD_BUF        = $AF1807
-    KBD_OUT_BUF        = $AF1803
-    KBD_INPT_BUF       = $AF1803
-    KBD_DATA_BUF       = $AF1803
-    PORT_A             = $AF180A   ;This is a Timing Register, the value is hard coded, so there is no need to use those
-    PORT_B             = $AF180B   ;This is a Timing Register, the value is hard coded, so there is no need to use those
-.fi
+; Kwyboard ports for FMX and U are different
+STATUS_PORT_FMX       = $AF1064
+KBD_INPT_BUF_FMX      = $AF1060
+
+STATUS_PORT_U         = $AF1807
+KBD_INPT_BUF_U        = $AF1803
+
 
 ; Status
 OUT_BUF_FULL          = $01
