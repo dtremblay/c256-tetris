@@ -321,6 +321,7 @@ LOOK_FOR_LINES
                 .as
                 STZ ROT_VAL2 ; line count max 4
                 STZ LINE_CNTR
+                STZ LINE_CNTR + 1
     INIT_LINE_CHECK
                 LDY #0
                 STZ ROT_VAL  ; column count max 10
@@ -1406,29 +1407,48 @@ DELETE_LINES
                 STA BYTE_CNTR
                 
                 TAX
+                INX
+                INX
         DL_CHECK_NEXT
-                INX
-                INX
                 
                 LDA @lBOARD,X
-                CMP #$A09
+                CMP #$A09  ; these are the start and middle tiles
                 BNE DONT_DELETE
                 
-                LDA #<>BOARD
-                CLC
-                ADC BYTE_CNTR
-                TAX
-                ADC #BOARD_WIDTH
-                TAY
-                LDA BYTE_CNTR
-                DEC A
-                MVP `BOARD,`BOARD
+                ; LDA #<>BOARD
+                ; CLC
+                ; ADC BYTE_CNTR
+                ; TAX
+                ; ADC #BOARD_WIDTH
+                ; TAY
+                ; LDA BYTE_CNTR
+                ; DEC A
+                ; MVP `BOARD,`BOARD
 
+                ; LDA BYTE_CNTR
+                ; TAX
+                ; LDA LINE_CNTR
+                ; DEC A
+                ; STA LINE_CNTR
+                
+                ; *************** Replace MVP with loop starting from the bottom ************
+                PHX
+                
                 LDA BYTE_CNTR
                 TAX
+        -       LDA BOARD,X
+                STA BOARD+BOARD_WIDTH,X
+                DEX
+                BNE -
+                
+                PLX
+                
+                ; check the next line
                 LDA LINE_CNTR
+                AND #$F
                 DEC A
                 STA LINE_CNTR
+                
                 BNE DL_CHECK_NEXT
                 
                 BRA DELETE_LINES_DONE
