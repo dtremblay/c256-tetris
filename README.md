@@ -6,7 +6,7 @@ The game demonstrates the use of the SOF and keybaord interrupts, tiles, backgro
 
 ![Emulated Image](/screenshots/game.png)
 
-The game is functional in the C256 Foenix IDE and the Rev C4 revision of the board.
+The game is functional in the C256 Foenix IDE and the Rev C4 revision of the board and on the Foenix U/U++.
 The game has:
 * four states: intro, play, game-over and hiscore username entry
 * back-ground music
@@ -16,8 +16,13 @@ The game has:
 Still to be added are:
 * Read and write high score from/to file.
 
+## How to compile
+Use "./asm.bat tetris.asm 1" for the FMX-only build, which uses the YM2151 sound chip, not supported by the U.
+Use "./asm.bat tetris.asm 2" for the OPL3 sound track, which works on both FMX and U.
+
 ## How to Play
 To play the game, you will need either the actual C256 Foenix hardware or the C256 Foenix IDE (available here: https://github.com/Trinity-11/FoenixIDE).
+NOTE: The FoenixIDE does not play the sounds.
 
 The game starts in the intro screen.
 Press <space> or joystick 1 <fire> button to start the game.
