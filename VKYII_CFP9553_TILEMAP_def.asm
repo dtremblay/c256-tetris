@@ -6,7 +6,7 @@ TILE_Enable             = $01
 ;
 ;Tile MAP Layer 0 Registers
 TL0_CONTROL_REG         = $AF0200       ; Bit[0] - Enable, Bit[3:1] - LUT Select,
-TL0_START_ADDY_L        = $AF0201       ; Not USed right now - Starting Address to where is the MAP
+TL0_START_ADDY_L        = $AF0201       ; Starting Address to where is the MAP
 TL0_START_ADDY_M        = $AF0202
 TL0_START_ADDY_H        = $AF0203
 TL0_TOTAL_X_SIZE_L      = $AF0204       ; Size of the Map in X Tile Count [9:0] (1024 Max)
@@ -20,7 +20,7 @@ TL0_WINDOW_Y_POS_H      = $AF020B       ; Direction: [14] Scroll: [13:10] Pos: [
 
 ;Tile MAP Layer 1 Registers
 TL1_CONTROL_REG         = $AF020C       ; Bit[0] - Enable, Bit[3:1] - LUT Select,
-TL1_START_ADDY_L        = $AF020D       ; Not USed right now - Starting Address to where is the MAP
+TL1_START_ADDY_L        = $AF020D       ; Starting Address to where is the MAP
 TL1_START_ADDY_M        = $AF020E
 TL1_START_ADDY_H        = $AF020F
 TL1_TOTAL_X_SIZE_L      = $AF0210       ; Size of the Map in X Tile Count [9:0] (1024 Max)
@@ -34,7 +34,7 @@ TL1_WINDOW_Y_POS_H      = $AF0217       ; Direction: [14] Scroll: [13:10] Pos: [
 
 ;Tile MAP Layer 2 Registers
 TL2_CONTROL_REG         = $AF0218       ; Bit[0] - Enable, Bit[3:1] - LUT Select,
-TL2_START_ADDY_L        = $AF0219       ; Not USed right now - Starting Address to where is the MAP
+TL2_START_ADDY_L        = $AF0219       ; Starting Address to where is the MAP
 TL2_START_ADDY_M        = $AF021A
 TL2_START_ADDY_H        = $AF021B
 TL2_TOTAL_X_SIZE_L      = $AF021C       ; Size of the Map in X Tile Count [9:0] (1024 Max)
@@ -48,7 +48,7 @@ TL2_WINDOW_Y_POS_H      = $AF0223       ; Direction: [14] Scroll: [13:10] Pos: [
 
 ;Tile MAP Layer 3 Registers
 TL3_CONTROL_REG         = $AF0224       ; Bit[0] - Enable, Bit[3:1] - LUT Select,
-TL3_START_ADDY_L        = $AF0225       ; Not USed right now - Starting Address to where is the MAP
+TL3_START_ADDY_L        = $AF0225       ; Starting Address to where is the MAP
 TL3_START_ADDY_M        = $AF0226
 TL3_START_ADDY_H        = $AF0227
 TL3_TOTAL_X_SIZE_L      = $AF0228       ; Size of the Map in X Tile Count [9:0] (1024 Max)

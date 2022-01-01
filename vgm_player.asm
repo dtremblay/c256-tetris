@@ -826,7 +826,7 @@ VGM_SET_LOOP_POINTERS
 VGM_INIT_TIMERS
             .as
             
-            LDA #64
+            LDA #$44
             STA TIMER0_CMP_L
             STA TIMER1_CMP_L
             LDA #1

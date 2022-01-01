@@ -1,5 +1,5 @@
 ; *************************************************************************
-; * Lame attempt at a copy-cat game like Tetris
+; * Attempt at a copy-cat game like Tetris
 ; * Author Daniel Tremblay
 ; * Code written for the C256 Foenix retro computer
 ; * Permission is granted to reuse this code to create your own games
@@ -19,6 +19,7 @@
 .include "math_def.asm"
 .include "GABE_Control_Registers_def.asm"
 .include "base.asm"
+.include "EXP_C200_EVID_def.asm"
 
 * = $000500
 .include "keyboard_def.asm"
@@ -116,12 +117,40 @@ GAME_START
                 STA EFFECT_PLAY
                 STA HISCORE_OFFSET
                 
+                ; set border color to 0
+                STA BORDER_COLOR_B
+                STA BORDER_COLOR_G
+                STA BORDER_COLOR_R
+                
+                LDA #1
+                STA LEVEL
+                STA BORDER_CTRL_REG ; enable the border
+                LDA #$20
+                STA BORDER_X_SIZE
+                STA BORDER_Y_SIZE
+                
+.for sc := 0, sc < 64, sc += 1
+                LDA #' '
+                STA EVID_TEXT_MEM + 100 * sc
+                LDA #$10
+                STA EVID_COLOR_MEM + 100 * sc
+.next
+                
+                
                 setal
                 LDA #5
                 STA GABE_RNG_SEED_LO ; set the max value from 0 to 6
                 STA PIECE_X
                 
                 setas
+                
+                LDA #EVID_Ctrl_Text_Mode_En
+                STA EVID_MSTR_CTRL_REG_L
+                
+                LDA #'A'
+                STA EVID_TEXT_MEM + 100 * 2
+                LDA #$10
+                STA EVID_COLOR_MEM + 100 * 2
                 
                 JSR LOAD_GAME_ASSETS
                 JSR ISDOS_INIT
@@ -1594,6 +1623,7 @@ INIT_GAME
                 STA BORDER_COLOR_B
                 STA BORDER_COLOR_G
                 STA BORDER_COLOR_R
+                
                 LDA #1
                 STA LEVEL
                 
@@ -1781,44 +1811,59 @@ LOAD_HI_SCORES
                 .as
                 
                 LDA SDCARD_PRSNT_MNT
-                BEQ LHS_DONE
+                BNE LHS_CARD_PRSNT
+                JMP LHS_DONE
                 
+   LHS_CARD_PRSNT
                 setal
                 LDA #<>tetris_scr
                 STA DOS_FD_PTR
+                LDA #`tetris_scr
+                STA DOS_FD_PTR + 2
                 
                 LDA #<>SCORE_PATH
                 STA tetris_scr.PATH
+                LDA #`SCORE_PATH
+                STA tetris_scr.PATH + 2
                 
                 LDA #<>HI_SCORES
+                STA DOS_DST_PTR
+                LDA #`HI_SCORES
+                STA DOS_DST_PTR + 2
+                
+                LDA #0
                 STA tetris_scr.BUFFER
+                LDA #$1F
+                STA tetris_scr.BUFFER + 2
                 setas
+                
                 LDA #2
                 STA tetris_scr.DEV
                 
-                LDA #`tetris_scr
-                STA DOS_FD_PTR + 2
-                LDA #`SCORE_PATH
-                STA tetris_scr.PATH + 2
-                LDA #`HI_SCORES
-                STA tetris_scr.BUFFER + 2
+                JSL F_LOAD
+                BCS LHS_FILE_EXISTS  ; F_OPEN was a success
                 
-                LDA #100
-                STA tetris_scr.SIZE
-                LDA #0
-                STA tetris_scr.SIZE + 2
+                BRA LHS_DONE
                 
-                JSL F_OPEN
-                ; check if there was an error
-                BCS LHS_DONE
                 
+    LHS_FILE_EXISTS
+                .as
                 LDA DOS_STATUS
-                CMP #4
-                BEQ LHS_DONE
+                BNE LHS_DONE
                 
-                ; if the file didn't exist, create it
-                JSL F_CREATE
-                BCC LHS_DONE
+                ; print O to evid to signify the file was open
+                LDA #'O'
+                STA EVID_TEXT_MEM + 100 * 5
+                LDA #$10
+                STA EVID_COLOR_MEM + 100 * 5
+                JSL F_CLOSE
+                
+                RTS
+                
+    LHS_FILE_CREATED
+                .as
+                LDA DOS_STATUS
+                BEQ LHS_DONE
                 
                 ;now copy the cluster to current
                 setal
@@ -1827,7 +1872,22 @@ LOAD_HI_SCORES
                 LDA tetris_scr.FIRST_CLUSTER + 2
                 STA tetris_scr.CLUSTER + 2
                 setas
+                
+                ; created the file
+                LDA #'Y'
+                STA EVID_TEXT_MEM + 100 * 6
+                LDA #$10
+                STA EVID_COLOR_MEM + 100 * 6
+                RTS
+                
     LHS_DONE
+                .as
+                LDA DOS_STATUS
+                CLC
+                ADC #$30
+                STA EVID_TEXT_MEM + 100 * 14
+                LDA #$10
+                STA EVID_COLOR_MEM + 100 * 14
                 RTS
                 
                 
@@ -2044,6 +2104,8 @@ HI_SCORES
     .fill 6, $20   ; only 6 characters for the name, null terminated
     .fill 4, 0     ; BCD encoded score
 .next
+; reserve the next 412 byte for the buffer
+     .fill 412, 0
 
 ; File Descriptor -- Used as parameter for higher level DOS functions
 FILEDESC            .struct

@@ -33,12 +33,21 @@ ISDOS_INIT
                 LDA SDC_TRANS_ERROR_REG
                 BEQ SD_INIT_SUCCESS
                 
+                LDA #'F'
+                STA EVID_TEXT_MEM + 100 *3
+                LDA #$10
+                STA EVID_COLOR_MEM + 100 *3
+                
                 BRA SD_INIT_DONE
                 
     SD_INIT_SUCCESS
                 ; SD Card is present
                 LDA #1
                 STA SDCARD_PRSNT_MNT
+                LDA #'B'
+                STA EVID_TEXT_MEM + 100 *3
+                LDA #$10
+                STA EVID_COLOR_MEM + 100 *3
 
     SD_INIT_DONE
                 TURN_OFF_SD_LED
