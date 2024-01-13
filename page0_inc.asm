@@ -181,16 +181,15 @@ TEST_END         = $007FFF ;0 Byte
 STACK_BEGIN      = $008000 ;32512 Bytes The default beginning of stack space
 STACK_END        = $00FEFF ;0 Byte  End of stack space. Everything below this is I/O space
 
-ISR_BEGIN        = $38FF00 ; Byte  Beginning of CPU vectors in Direct page
-HRESET           = $38FF00 ;16 Bytes Handle RESET asserted. Reboot computer and re-initialize the kernel.
-HCOP             = $38FF10 ;16 Bytes Handle the COP instruction. Program use; not used by OS
-HBRK             = $38FF20 ;16 Bytes Handle the BRK instruction. Returns to BASIC Ready prompt.
-HABORT           = $38FF30 ;16 Bytes Handle ABORT asserted. Return to Ready prompt with an error message.
-HNMI             = $38FF40 ;32 Bytes Handle NMI
-HIRQ             = $38FF60 ;32 Bytes Handle IRQ
-Unused_FF80      = $38FF80 ;End of direct page Interrrupt handlers
+ISR_BEGIN        = $FF00 ; Byte  Beginning of CPU vectors in Direct page
+HRESET           = $FF00 ;16 Bytes Handle RESET asserted. Reboot computer and re-initialize the kernel.
+HCOP             = $FF10 ;16 Bytes Handle the COP instruction. Program use; not used by OS
+HBRK             = $FF20 ;16 Bytes Handle the BRK instruction. Returns to BASIC Ready prompt.
+HABORT           = $FF30 ;16 Bytes Handle ABORT asserted. Return to Ready prompt with an error message.
+HNMI             = $FF40 ;32 Bytes Handle NMI
+HIRQ             = $FF60 ;32 Bytes Handle IRQ
+Unused_FF80      = $FF80 ;End of direct page Interrrupt handlers
 
-VECTORS_BEGIN    = $38FFE0 ;0 Byte  Interrupt vectors
 JMP_READY        = $00FFE0 ;4 Bytes Jumps to ROM READY routine. Modified whenever alternate command interpreter is loaded.
 VECTOR_COP       = $00FFE4 ;2 Bytes Native COP Interrupt vector
 VECTOR_BRK       = $00FFE6 ;2 Bytes Native BRK Interrupt vector

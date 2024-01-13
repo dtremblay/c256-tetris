@@ -1,4 +1,4 @@
-; Kwyboard ports for FMX and U are different
+; Keyboard ports for FMX and U are different
 STATUS_PORT_FMX       = $AF1064
 KBD_INPT_BUF_FMX      = $AF1060
 

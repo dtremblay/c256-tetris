@@ -43,19 +43,10 @@ AY_3_8910_N       = $96 ; 2 bytes
 DATA_STREAM_CNT   = $7D ; 2 byte
 DATA_STREAM_TBL   = $8000 ; each entry is 4 bytes
 
-increment_long_addr .macro
-            setal
-            INC \1
-            BNE increment_done
-            INC \1 + 2
-    increment_done
-            setas
-                    .endm
 ; *******************************************************************
 ; * Interrupt driven sub-routine.
 ; *******************************************************************
 VGM_WRITE_REGISTER
-            .as
             LDX WAIT_CNTR
             CPX #0
             BEQ READ_COMMAND
@@ -104,44 +95,41 @@ VGM_COMMAND_TABLE
             .word <>SKIP_FOUR_BYTES ;F - not implemented
             
 INVALID_COMMAND
-            .as
             JMP VGM_WRITE_REGISTER
 
+; first parameter is the address to incremented
+; second parameter is the number of bytes to skip
+increment_long_addr 
+            .macro
+            CLC
+            LDA \1
+            ADC #\2
+            STA \1
+            BCC skip_n_done
+            
+            LDA \1 + 1
+            ADC #0
+            STA \1 + 1
+            BCC skip_n_done
+            
+            LDA \1 + 2
+            ADC #0
+            STA \1 + 2
+            BCC skip_n_done
+            
+            LDA \1 + 3
+            ADC #0
+            STA \1 + 3
+
+    skip_n_done
+            .endm
+            
 SKIP_BYTE_CMD
-            .as
-            increment_long_addr CURRENT_POSITION
+            increment_long_addr CURRENT_POSITION, 1
             JMP VGM_WRITE_REGISTER
-
-SKIP_TWO_BYTES
-            .as
-            setal
-            INC CURRENT_POSITION
-            BNE s2_1
-            INC CURRENT_POSITION + 2
-    s2_1
-            INC CURRENT_POSITION
-            BNE s2_2
-            INC CURRENT_POSITION + 2
-    s2_2
-            setas
-            JMP VGM_WRITE_REGISTER
-
-SKIP_THREE_BYTES
-            .as
-            setal
-            INC CURRENT_POSITION
-            BNE s3_1
-            INC CURRENT_POSITION + 2
-    s3_1
-            INC CURRENT_POSITION
-            BNE s3_2
-            INC CURRENT_POSITION + 2
-    s3_2
-            INC CURRENT_POSITION
-            BNE s3_3
-            INC CURRENT_POSITION + 2
-    s3_3
-            setas
+            
+SKIP_FOUR_BYTES
+            increment_long_addr CURRENT_POSITION, 4
             JMP VGM_WRITE_REGISTER
 
 SEEK_OFFSET
@@ -152,56 +140,37 @@ SEEK_OFFSET
             
             ; read 4 bytes, add them to the databank 0 offset
             ; and store in the PCM_OFFSET
-            setal
             LDA [CURRENT_POSITION]
             STA ADDER_A
-            increment_long_addr CURRENT_POSITION
-            increment_long_addr CURRENT_POSITION
-            setal
-            LDA [CURRENT_POSITION]
+            LDA [CURRENT_POSITION+1]
+            STA ADDER_A + 1
+            LDA [CURRENT_POSITION+2]
             STA ADDER_A + 2
-            increment_long_addr CURRENT_POSITION
-            increment_long_addr CURRENT_POSITION
-            setal
+            LDA [CURRENT_POSITION+3]
+            STA ADDER_A + 3
+            
+            increment_long_addr CURRENT_POSITION,4
+            
             LDA DATA_STREAM_TBL
             STA ADDER_B
+            LDA DATA_STREAM_TBL + 1
+            STA ADDER_B + 1
             LDA DATA_STREAM_TBL + 2
             STA ADDER_B + 2
+            LDA DATA_STREAM_TBL + 3
+            STA ADDER_B + 3
             
             LDA ADDER_R
             STA PCM_OFFSET
             LDA ADDER_R + 2
             STA PCM_OFFSET + 2
-            setas
             
             JMP VGM_LOOP_DONE
             
-SKIP_FOUR_BYTES
-            .as
-            setal
-            INC CURRENT_POSITION
-            BNE s4_1
-            INC CURRENT_POSITION + 2
-    s4_1
-            INC CURRENT_POSITION
-            BNE s4_2
-            INC CURRENT_POSITION + 2
-    s4_2
-            INC CURRENT_POSITION
-            BNE s4_3
-            INC CURRENT_POSITION + 2
-    s4_3
-            INC CURRENT_POSITION
-            BNE s4_4
-            INC CURRENT_POSITION + 2
-    s4_4
-            setas
-            JMP VGM_WRITE_REGISTER
 
 ; we need to combine R1 and R0 together before we send
 ; the data to the SN76489
-AY8910 
-            .as
+AY8910
             LDA COMMAND
             CMP #$A0
             BEQ AY_COMMAND
@@ -211,7 +180,7 @@ AY8910
     AY_COMMAND
             ; the second byte is the register
             LDA [CURRENT_POSITION]
-            increment_long_addr CURRENT_POSITION
+            increment_long_addr CURRENT_POSITION,1
             CMP #0 ; Register 0 fine
             BNE AY_R1
             
@@ -223,13 +192,13 @@ AY8910
             STA PSG_BASE_ADDRESS
             LDA #$3F
             STA PSG_BASE_ADDRESS
-            increment_long_addr CURRENT_POSITION
+            increment_long_addr CURRENT_POSITION,1
             JMP VGM_WRITE_REGISTER
             
         R0_FINE
             XBA
             LDA [CURRENT_POSITION]
-            increment_long_addr CURRENT_POSITION
+            increment_long_addr CURRENT_POSITION,1
             
             setal
             LSR A ; drop the LSB
@@ -486,8 +455,8 @@ WRITE_YM_CMD
             increment_long_addr CURRENT_POSITION
             
             ; the third byte is the value to write in the register
-            LDA [CURRENT_POSITION]
-            STA @lOPM_BASE_ADDRESS,X
+            ;LDA [CURRENT_POSITION]
+            ;STA @lOPM_BASE_ADDRESS,X
             increment_long_addr CURRENT_POSITION
             JMP VGM_WRITE_REGISTER
             
@@ -827,28 +796,28 @@ VGM_INIT_TIMERS
             .as
             
             LDA #$44
-            STA TIMER0_CMP_L
-            STA TIMER1_CMP_L
+            STA TIMER0_CMP
+            STA TIMER1_CMP
             LDA #1
-            STA TIMER0_CMP_M
-            STA TIMER1_CMP_M
+            STA TIMER0_CMP+1
+            STA TIMER1_CMP+1
             LDA #0
-            STA TIMER0_CMP_H
-            STA TIMER1_CMP_H
+            STA TIMER0_CMP+2
+            STA TIMER1_CMP+2
             
             LDA #0    ; set timer0 charge to 0
-            STA TIMER0_CHARGE_L
-            STA TIMER0_CHARGE_M
-            STA TIMER0_CHARGE_H
-            STA TIMER1_CHARGE_L
-            STA TIMER1_CHARGE_M
-            STA TIMER1_CHARGE_H
+            STA TIMER0_CHARGE
+            STA TIMER0_CHARGE+1
+            STA TIMER0_CHARGE+2
+            STA TIMER1_CHARGE
+            STA TIMER1_CHARGE+1
+            STA TIMER1_CHARGE+2
             
-            LDA #TMR0_CMP_RECLR  ; count up from "CHARGE" value to TIMER_CMP
+            LDA #TMR_CMP_RECLR  ; count up from "CHARGE" value to TIMER_CMP
             STA TIMER0_CMP_REG
             STA TIMER1_CMP_REG
             
-            LDA #(TMR0_EN | TMR0_UPDWN | TMR0_SCLR)
+            LDA #(TMR_EN | TMR_UPDWN | TMR_SCLR)
             STA TIMER0_CTRL_REG
             STA TIMER1_CTRL_REG
 

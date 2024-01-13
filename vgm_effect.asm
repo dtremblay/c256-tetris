@@ -2,7 +2,6 @@
 ; * Play a special effect using the SN76489
 ; *****************************************************************************
 play_effect     .macro
-                .as
                 LDX \1
                 CPX #0
                 BEQ PE_READ_COMMAND
@@ -64,7 +63,6 @@ PLAY_R_EFFECT
 ; * Setup the Tile Down Effect
 ; *****************************************************************************
 PLAY_EFFECT_TILE_DOWN
-                .as
                 LDX #<>VGM_EFFECT_DROP + $40 ; we know the offset already
                 STX EFFECT_T_POSITION
                 LDA #`VGM_EFFECT_DROP + $40
@@ -87,7 +85,6 @@ PLAY_EFFECT_TILE_DOWN
 ; * Setup the Line Effect
 ; *****************************************************************************
 PLAY_EFFECT_LINE
-                .as
                 LDX #<>VGM_EFFECT_LINE + $40 ; we know the offset already
                 STX EFFECT_L_POSITION
                 LDA #`VGM_EFFECT_LINE + $40
