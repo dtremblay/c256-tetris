@@ -188,13 +188,14 @@ SOF_INTERRUPT
                 ; JSR HANDLE_JOYSTICK
                 
                 LDA GAME_STATE  ; The SOF is still getting called, even when masked
-                ;BNE CHK_GAME_OVER 
-                ; JSR DISPLAY_BOARD_LOOP
-                ; BRA SOF_DONE
+                BNE CHK_GAME_OVER
                 
-    ; CHK_GAME_OVER
-                ; CMP #GS_GAME_OVER
-                ; BNE CHK_REMOVE_LINES
+                JSR DISPLAY_BOARD_LOOP
+                BRA SOF_DONE
+                
+    CHK_GAME_OVER
+                CMP #GS_GAME_OVER
+                BNE CHK_REMOVE_LINES
                 
                 ; ; count 60 ticks for 1 second
                 ; LDA GAME_OVER_TICK
@@ -222,24 +223,25 @@ SOF_INTERRUPT
                 ; JSR CLR_SCREEN
                 ; JSR DISPLAY_INTRO
                 
-                ; BRA SOF_DONE
+                BRA SOF_DONE
                 
-    ; CHK_REMOVE_LINES
+    CHK_REMOVE_LINES
                 
-                ; CMP #3
-                ; BNE CHK_INTRO_SCREEN
+                CMP #GS_LINE_BONUS
+                BNE CHK_INTRO_SCREEN
                 ; JSR REMOVE_LINES_LOOP
-                ; BRA SOF_DONE
+                BRA SOF_DONE
                 
     CHK_INTRO_SCREEN
-                CMP #4
-                ; BNE CHK_ENTRY_SCREEN
+                CMP #GS_INTRO
+                BNE CHK_ENTRY_SCREEN
+                
                 JSR INTRO_LOOP
                 BRA SOF_DONE
                 
-    ; CHK_ENTRY_SCREEN
-                ; CMP #5
-                ; BNE SOF_DONE
+    CHK_ENTRY_SCREEN
+                CMP #GS_NAME_ENTRY
+                BNE SOF_DONE
                 
                 ; ; write the user entry
                 ; LDY #$A000 + COLUMNS_PER_LINE * 32 + 40

@@ -961,7 +961,7 @@ DRAW_NEXT_PIECE
                 CMP #0
                 BEQ DRAW_BLANK
                 
-                LDA NEXT_PIECE ; skip fist two tiles
+                LDA NEXT_PIECE ; skip first two tiles
                 CLC
                 ADC #2
                 

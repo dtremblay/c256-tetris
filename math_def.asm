@@ -17,4 +17,4 @@ D0_REMAINDER     = $DE16 ; 2 Bytes remainder of Num/Den ex: 7/2 = 3 r 1
 ; 32Bit Adder
 ADDER_A          = $DE08 ; 4 bytes (32 bit) Accumulator A
 ADDER_B          = $DE0C ; 4 bytes (32 bit) Accumulator B
-ADDER_R          = $DE18 ; 4 bytes (32 bit) Result
+ADDER_RES        = $DE18 ; 4 bytes (32 bit) Result

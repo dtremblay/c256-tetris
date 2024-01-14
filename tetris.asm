@@ -12,6 +12,7 @@
 .include "macros_inc.asm"
 .include "dma-macro.asm"
 .include "dma_inc.asm"
+.include "rtc_def.asm"
 .include "interrupt_def.asm"
 .include "timer_def.asm"
 .include "math_def.asm"
@@ -54,7 +55,7 @@ PIECE_X         .word 5
 PIECE_Y         .word 0
 PIECE_ROT       .byte 0
 PIECE_FIT       .byte 0
-GAME_SPEED      .byte 0 ; how many ticks beteen bars falling
+GAME_SPEED      .byte 0  ; how many ticks beteen bars falling
 PIECE_CNTR      .byte 0  ; we increase the speed of the game for every 10 pieces
 SCORE           .fill 4, 0  ; decimal formatted score
 GAME_STATE      .byte 4
@@ -69,7 +70,7 @@ LEVEL           .byte 1
 
 
 START_BOARD     = (BOARD + (40*5 + (40-BOARD_WIDTH)/2 + 1)*2)
-NEXT_PIECE_LOC  = (1 + $40 *11 + 31) * 2 + <>TL_MAP_0_ADDR
+NEXT_PIECE_LOC  = (BOARD + (40*11 + 32)*2)
 PIECE_VALUE     = $25  ; we're doing BCD additions
 
 EFFECT_T_POSITION = $60 ; 4 bytes
@@ -143,8 +144,10 @@ GAME_START
                 
                 ; TODO: disable sprites too
                 
+                ; write the RNG seed
+                LDA RTC_SECS
+                STA RND_SEEDL 
                 LDA #5
-                STA RND_SEEDL ; set the max value from 0 to 6
                 STA PIECE_X
                 STZ RND_SEEDH
                 LDA #RND_ENABLE + RND_SEED_LOAD
@@ -279,18 +282,224 @@ DISPLAY_BOARD_LOOP
                 STA PIECE_Y
                 
     TIMING_DONE
+                ; does the piece fit in this position?
+                JSR DOES_PIECE_FIT
+                LDA PIECE_FIT
+                BEQ LOGIC_DONE
+                
+                ; if Y position is 0, then game over
+                LDA PIECE_Y
+                BNE NOT_GAME_OVER
+                JMP GAME_OVER
+                
+        NOT_GAME_OVER
+                ; set the piece in place
+                ;JSR PLAY_EFFECT_TILE_DOWN
+                ; this is no longer required - JSR COPY_PIECE - DRAW_PIECE does it all on F256
+                
+                SED
+                CLC
+                LDA SCORE
+                ADC #PIECE_VALUE
+                STA SCORE
+                BCC NG_CONTINUE
+                
+                LDA SCORE + 1
+                ADC #0
+                STA SCORE + 1
+                BCC NG_CONTINUE
+                
+                LDA SCORE + 2
+                ADC #0
+                STA SCORE + 2
+                BCC NG_CONTINUE
+                
+                LDA SCORE + 3
+                ADC #0
+                STA SCORE + 3
+
+        NG_CONTINUE
+                CLD
+                
+                JSR LOOK_FOR_LINES
+                
+                ; choose another piece and set it at the top
+                LDA #5
+                STA PIECE_X
+                LDA #0
+                STA PIECE_Y
+                STA PIECE_FIT
+                STA PIECE_ROT
+                STA TICK_COUNT
+                
+                JSR PICK_NEXT_PIECE
+                ; draw the next piece
+                JSR DRAW_NEXT_PIECE
+                
+                LDA PIECE_CNTR
+                INC A
+                STA PIECE_CNTR
+                CMP #10
+                BNE LOGIC_DONE
+                
+                ; increase difficulty level and game speed
+                LDA #0
+                STA PIECE_CNTR
+                SED
+                CLC
+                LDA LEVEL
+                ADC #1
+                STA LEVEL
+                CLD
+                LDA GAME_SPEED
+                SEC
+                SBC #2
+                STA GAME_SPEED
+                
+    LOGIC_DONE
+                ;JSR DRAW_FRAME ; I should not need to do this every refresh
+                JSR DRAW_PIECE
+                JSR DRAW_HI_SCORES
+                JSR DRAW_SCORE
+                JSR DRAW_LEVEL
+                JSR DRAW_LINES
+                
 				RTS
    
 ; ****************************************************************308          
 ; *  Randomly pick the next piece        
 ; *******************************************************************
 PICK_NEXT_PIECE
-			    RTS
+                LDA NEXT_PIECE
+                STA CURRENT_PIECE
+                
+    PN_TRY_AGAIN
+                LDA RND_L
+                AND #7
+                STA NEXT_PIECE
+                CMP #7
+                BEQ PN_TRY_AGAIN
+                RTS
 
 ; ****************************************************************337
 ; * Look for lines
 ; *******************************************************************
 LOOK_FOR_LINES
+	BRA CHK_NEXT_LINE
+                RTS
+                
+	LINE_FOUND
+				BRA CHK_NEXT_LINE
+
+; ****************************************************************416
+; * Get Piece Value - TODO: rename to GET_TILE_VALUE
+; * X must contain the piece value multiplied by 16.
+; * This is really way too complicated.  Store the rotations in memory
+; *  and retrieve them.
+; *******************************************************************     
+GET_PIECE_VALUE
+
+                LDA PIECE_ROT
+                BNE ROT_NEXT
+                
+                ; if rotation is 0, return one of the following
+                ; 0,1,2,3, 4,5,6,7, 8,9,10,11, 12,13,14,15
+                LDA PIECE0,X  ; ROTATION 0
+                RTS
+    ROT_NEXT
+                CMP #1
+                BNE ROT_2
+                
+                ; if rotation is 1, return on of the following
+                ; 12,8,4,0, 13,9,5,1, 14,10,6,2, 15,11,7,3
+                PHX
+                TXA
+                AND #$F0
+                STA ROT_VAL2
+                
+                TXA
+                AND #3
+                TAX
+                SEC
+                LDA #12       ; ROTATION 1
+        CMP_R1
+                CPX #0
+                BEQ R1_DONE
+                SBC #4
+                DEX
+                BRA CMP_R1
+        R1_DONE
+                STA ROT_VAL
+                PLA
+                ; LDA 1,S
+                LSR A
+                LSR A
+                AND #3
+                CLC
+                ADC ROT_VAL
+                ADC ROT_VAL2
+                TAX
+                LDA PIECE0,X  ; ROTATION 1
+                PLX
+                RTS
+    ROT_2
+                CMP #2
+                BNE ROT_3
+                
+                ; if rotation is 2, return on of the following
+                ; 15,14,13,12, 11,10,9,8, 7,6,5,4, 3,2,1,0
+                PHX
+                
+                TXA
+                AND #$F0
+                STA ROT_VAL2
+                TXA
+                AND #$F
+                STA ROT_VAL
+                SEC
+                LDA #$F
+                SBC ROT_VAL
+                CLC
+                ADC ROT_VAL2
+                TAX
+                LDA PIECE0,X  ; ROTATION 2
+                
+                ;PLX
+                RTS
+                
+    ROT_3       
+                ; if rotation is 2, return on of the following
+                ; 15,14,13,12, 11,10,9,8, 7,6,5,4, 3,2,1,0
+                PHX
+                TXA
+                AND #$F0
+                STA ROT_VAL2
+                TXA
+                AND #$C
+                LSR A
+                LSR A
+                STA ROT_VAL
+                
+                PLA
+                ;LDA 1,S
+                AND #3
+                TAX
+                LDA #3       ; ROTATION 3
+        CMP_R3
+                CPX #0
+                BEQ R3_DONE
+                CLC
+                ADC #4
+                DEX
+                BRA CMP_R3
+        R3_DONE
+                SEC
+                SBC ROT_VAL
+                CLC
+                ADC ROT_VAL2
+                TAX
+                LDA PIECE0,X  ; ROTATION 3
+                ;PLX
                 RTS
                 
 ; **************************************************************************512
@@ -300,11 +509,47 @@ LOOK_FOR_LINES
 ; *****************************************************************************
 HANDLE_JOYSTICK
                 RTS
+                
+; **************************************************************************569
+; * User Pressed Left Arrow
+; *****************************************************************************
+MOVE_PIECE_LEFT
+				RTS
+
+; **************************************************************************595
+; * User Pressed Right Arrow
+; *****************************************************************************
+MOVE_PIECE_RIGHT
+				RTS
+
+; **************************************************************************621
+; * User Pressed Down Arrow
+; *****************************************************************************
+MOVE_PIECE_DOWN
+				RTS
+
+; **************************************************************************647
+; * User Pressed Space Bar
+; *****************************************************************************
+ROTATE_PIECE
+				RTS
+
+; **************************************************************************695
+; * Lock a piece into place
+; *****************************************************************************
+COPY_PIECE      ;removed on F256
+                RTS
+
+; **************************************************************************753
+; * This is the tougher function.  Used to detect collisions.
+; *****************************************************************************
+DOES_PIECE_FIT
+                RTS
 
 ; **************************************************************************819
 ; draw the board as tiles
 ; *****************************************************************************
-DRAW_BOARD
+DRAW_FRAME
                 LDA #<START_BOARD
                 STA CURSORPOS
                 LDA #>START_BOARD
@@ -338,7 +583,7 @@ DRAW_BOARD
                 ADC #40 * 2
                 STA CURSORPOS
                 BCC +
-                 INC CURSORPOS + 1
+                INC CURSORPOS + 1
                 
          +      INX
                 CPX #BOARD_HEIGHT
@@ -356,10 +601,251 @@ DRAW_BOARD
                 BNE -
                 
                 RTS
-                
-DRAW_NEXT_PIECE
-                RTS
 
+; **************************************************************************871
+; * Draw the piece in the board
+; *****************************************************************************
+DRAW_PIECE
+                LDA CURRENT_PIECE
+                ASL A
+                ASL A
+                ASL A
+                ASL A
+                TAX
+                
+                ; Put the StartBoard + Py*40*2 into cursorpos
+                LDA PIECE_Y
+                STA MULU_A
+                STZ MULU_A + 1
+                LDA #40*2
+                STA MULU_B
+                STZ MULU_B + 1
+                
+                LDA MULU_RES
+                STA ADDER_A
+                LDA MULU_RES+1
+                STA ADDER_A + 1
+                LDA #<START_BOARD
+                STA ADDER_B
+                LDA #>START_BOARD
+                STA ADDER_B+1
+                
+                LDA ADDER_RES
+                STA CURSORPOS
+                LDA ADDER_RES+1
+                STA CURSORPOS+1
+                
+    CP_NEXT_ROW ; Put the Px * 2 into Y
+                LDA PIECE_X
+                ASL A
+                TAY 
+                
+    NEXT_COPY
+                JSR GET_PIECE_VALUE
+                CMP #0
+                BEQ SKIP_COPY
+                
+                ; is the board occupied for this byte
+                ;PHX
+                ;TYX
+                STA (CURSORPOS),Y
+                ;PLX
+                
+        SKIP_COPY
+                INX
+                INY
+                LDA #0
+                STA (CURSORPOS),Y
+                INY
+                ; we have to copy 4 tiles per row
+                TXA
+                AND #3
+                BNE NEXT_COPY
+                
+                ; draw into the next row
+                CLC
+                LDA CURSORPOS
+                ADC #40*2
+                STA CURSORPOS
+                BCC +
+                INC CURSORPOS+1
+                
+                
+         +      TXA
+                AND #$F
+                BNE CP_NEXT_ROW
+                
+                RTS
+                
+; ************************************************************932
+; * Draw Next Piece to the right of the board.
+; * Since the tiles are 8x8, we could probably replace
+; * with sprites, but this would use more memory.
+; ***************************************************************
+DRAW_NEXT_PIECE
+                display_text 56, 19, $20, NEXT_TILE_MSG
+                
+                LDA #<NEXT_PIECE_LOC
+                STA CURSORPOS
+                LDA #>NEXT_PIECE_LOC
+                STA CURSORPOS + 1
+                
+                LDA NEXT_PIECE ; each piece is 16 bytes
+                ASL A
+                ASL A
+                ASL A
+                ASL A
+                TAX
+    DNP_SYMBOL_NEXT_LINE
+                LDY #0
+        DNP_SYMBOL
+                LDA PIECE0,X
+                CMP #0
+                BEQ DNP_DRAW_BLANK
+                
+        DNP_DRAW_BLANK
+                STA (CURSORPOS),Y
+                
+                INX
+                INY
+                LDA #0
+                STA (CURSORPOS),Y
+                INY
+                TXA
+                AND #3
+                BNE DNP_SYMBOL
+                
+                LDA CURSORPOS
+                CLC
+                ADC #40 * 2
+                STA CURSORPOS
+                BCC +
+                INC CURSORPOS + 1
+                
+        +       TXA
+                AND #$F
+
+                BNE DNP_SYMBOL_NEXT_LINE
+                
+                RTS
+      
+; *************************************************************************992
+; * Draw Score      
+; ****************************************************************************
+DRAW_SCORE
+                display_text 56,5,$20,SCORE_MSG
+                CLC
+                LDA CURSORPOS
+                ADC #8
+                STA CURSORPOS
+                LDA SCORE + 2
+                JSR DISPLAY_HEX
+                LDA SCORE + 1
+                JSR DISPLAY_HEX
+                LDA SCORE
+                JSR DISPLAY_HEX
+                RTS
+                
+; ************************************************************************1015
+; * Draw High Scores     
+; ****************************************************************************
+DRAW_HI_SCORES
+                display_text 3,5,$20,HI_SCORE_MSG
+                
+                ; prepare to write the high scores
+                LDA #<(TEXT_START + COLUMNS_PER_LINE*6 + 3)
+                STA CURSORPOS
+                LDA #>(TEXT_START + COLUMNS_PER_LINE*6 + 3)
+                STA CURSORPOS + 1
+                
+                LDA #<HI_SCORES
+                STA MSG_ADDR
+                LDA #>HI_SCORES
+                STA MSG_ADDR+1
+                
+                LDX #0
+                LDA #$40
+                STA CURCOLOR
+                
+    DHS_NEXT_SCORE
+                JSR DISPLAY_MSG
+                
+                ; display the score
+                CLC
+                LDA CURSORPOS
+                ADC #7
+                STA CURSORPOS
+                LDA HI_SCORES + 9,X
+                JSR DISPLAY_HEX
+                LDA HI_SCORES + 8,X
+                JSR DISPLAY_HEX
+                LDA HI_SCORES + 7,X
+                JSR DISPLAY_HEX
+                
+                ; increment the score reader to the next line
+                TXA
+                CLC
+                ADC #10
+                TAX
+                
+                ; place the start of the message to the next player's name
+                CLC
+                LDA MSG_ADDR
+                ADC #10
+                STA MSG_ADDR
+                
+                ; calculate the position to write to
+                LDA CURSORPOS
+                CLC
+                ADC #COLUMNS_PER_LINE - 13 ; name is 6+1 and score is 3 * 2 chars = 13
+                STA CURSORPOS
+                BCC +
+                INC CURSORPOS + 1
+                
+         +      ; if the score is not zero, then display the name and score
+                LDA HI_SCORES + 7,X
+                BNE DHS_NEXT_SCORE
+                LDA HI_SCORES + 8,X
+                BNE DHS_NEXT_SCORE
+                LDA HI_SCORES + 9,X
+                BNE DHS_NEXT_SCORE
+
+                RTS
+                
+; ************************************************************************1076
+; * Draw Level  
+; ****************************************************************************
+DRAW_LEVEL
+                display_text 56,7,$20,LEVEL_MSG
+                
+                ; right align the level with the score above
+                CLC
+                LDA CURSORPOS
+                ADC #12
+                STA CURSORPOS
+                LDA LEVEL
+                JSR DISPLAY_HEX
+                RTS
+                
+                
+; ************************************************************************1098
+; * Draw Lines  
+; ****************************************************************************
+DRAW_LINES
+                display_text 56,13, $20, LINES_MSG
+                
+                ; right align the level with the score above
+                CLC
+                LDA CURSORPOS
+                ADC #10
+                STA CURSORPOS
+
+                LDA TOTAL_LINES+1
+                JSR DISPLAY_HEX
+                LDA TOTAL_LINES
+                JSR DISPLAY_HEX
+                RTS
+                
 ; *************************************************************************1219
 ; * Display a text message
 ; * The message pointer is in MSG_ADDR and must be zero terminated.
@@ -370,28 +856,24 @@ DISPLAY_MSG
                 ; save the IO PAGE in the stack
                 LDA MMU_IO_CTRL
                 PHA
-
+                LDY #0
           -
                 ; copy the character
                 LDA #IO_PAGE2
                 STA MMU_IO_CTRL
-                LDA (MSG_ADDR)
+                LDA (MSG_ADDR),Y
                 BEQ MSG_DONE
                 
-                STA (CURSORPOS)
+                STA (CURSORPOS),Y
                 ; change the color
                 LDA #IO_PAGE3
                 STA MMU_IO_CTRL
                 LDA CURCOLOR
-                STA (CURSORPOS)
+                STA (CURSORPOS),Y
                 
-                INC MSG_ADDR
-                BNE +
-                INC MSG_ADDR + 1
-           +    INC CURSORPOS
-                BNE +    
-                INC CURSORPOS + 1                
-           +    BRA -
+                INY
+                CPY #64
+                BNE -
                 
     MSG_DONE    
                 ; restore the IO Page
@@ -404,6 +886,56 @@ DISPLAY_MSG
 ; *****************************************************************************
 GAME_OVER
 				RTS
+                
+; *************************************************************************1386
+; * Display Hex value at CursorPos, with color CURCOLOR
+; * Value to display is in A
+; *****************************************************************************  
+DISPLAY_HEX
+                PHX
+                ;push IO Page
+                LDX MMU_IO_CTRL
+                PHX
+                
+                PHA
+                
+                
+                AND #$F0
+                LSR A
+                LSR A
+                LSR A
+                LSR A
+                CLC
+                ADC #'0'
+                
+                LDX #IO_PAGE2
+                STX MMU_IO_CTRL
+                STA (CURSORPOS)
+                
+                ; write the two color bytes now
+                LDX #IO_PAGE3
+                STX MMU_IO_CTRL
+                LDA CURCOLOR
+                STA (CURSORPOS)
+                INC CURSORPOS
+                STA (CURSORPOS)
+                
+                PLA
+                AND #$F
+                CLC
+                ADC #'0'
+                
+                LDX #IO_PAGE2
+                STX MMU_IO_CTRL
+                STA (CURSORPOS)
+                INC CURSORPOS
+                
+                ; restore MMU IO PAGE
+                PLA
+                STA MMU_IO_CTRL
+                
+                PLX
+                RTS
     
 ; *************************************************************************1498
 ; * Load Game Assets in memory
@@ -519,6 +1051,7 @@ INIT_GAME
                 LDA #1
                 STA LEVEL
                 
+                ; clear tileset
                 dma_fill 0, BOARD, 40*30*2
                 
                 ; enable the board tiles
@@ -527,7 +1060,7 @@ INIT_GAME
                 ; disable the intro tiles
                 STZ VKY_TILEMAP1_CTRL
                 
-                JSR DRAW_BOARD
+                JSR DRAW_FRAME
                 
                 ; load the play music
                 ; LDA #`VGM_PLAY_MUSIC
@@ -665,45 +1198,45 @@ BYTE_CNTR       .word 0
 SCORE_PATH      .text 'tetris.scr',0
 
 PIECE0
-    .byte 0,0,1,0
-    .byte 0,0,1,0
-    .byte 0,0,1,0
-    .byte 0,0,1,0
+    .byte 0,0,3,0
+    .byte 0,0,3,0
+    .byte 0,0,3,0
+    .byte 0,0,3,0
 
 PIECE1
-    .byte 0,1,1,0
-    .byte 0,1,1,0
+    .byte 0,4,4,0
+    .byte 0,4,4,0
     .byte 0,0,0,0
     .byte 0,0,0,0
 
 PIECE2
-    .byte 0,1,0,0
-    .byte 0,1,0,0
-    .byte 0,1,1,0
+    .byte 0,5,0,0
+    .byte 0,5,0,0
+    .byte 0,5,5,0
     .byte 0,0,0,0
 
 PIECE3
-    .byte 0,0,1,0
-    .byte 0,0,1,0
-    .byte 0,1,1,0
+    .byte 0,0,6,0
+    .byte 0,0,6,0
+    .byte 0,6,6,0
     .byte 0,0,0,0
 
 PIECE4
-    .byte 0,0,1,0
-    .byte 0,1,1,0
-    .byte 0,0,1,0
+    .byte 0,0,7,0
+    .byte 0,7,7,0
+    .byte 0,0,7,0
     .byte 0,0,0,0
 
 PIECE5
-    .byte 0,0,1,0
-    .byte 0,1,1,0
-    .byte 0,1,0,0
+    .byte 0,0,8,0
+    .byte 0,8,8,0
+    .byte 0,8,0,0
     .byte 0,0,0,0
 
 PIECE6
-    .byte 0,1,0,0
-    .byte 0,1,1,0
-    .byte 0,0,1,0
+    .byte 0,2,0,0
+    .byte 0,2,2,0
+    .byte 0,0,2,0
     .byte 0,0,0,0
 
 BOARD
@@ -712,12 +1245,16 @@ BOARD
 HI_SCORES
     .text 'DAN   ',0
     .byte $86,$24,$00 ; little-endian
-.rept 9
+    .text 'TINTIN',0
+    .byte $35,$22,$00 ; little-endian
+    .text 'MILOU ',0
+    .byte $75,$21,$00 ; little-endian
+.rept 7
     .fill 6, $20   ; only 6 characters for the name, null terminated
     .fill 4, 0     ; BCD encoded score
 .next
-; reserve the next 412 byte for the buffer
-     .fill 412, 0
+; reserve the next 412 byte for the SD card buffer
+    .fill 412, 0
      
 ; File Descriptor -- Used as parameter for higher level DOS functions
 FILEDESC            .struct
