@@ -40,7 +40,7 @@ TARGET_F256        = 3
 COLUMNS_PER_LINE   = 80
 ROW_PER_PAGE       = 60
 INITIAL_GAME_SPEED = 40
-BOARD_WIDTH        = 14
+BOARD_WIDTH        = 10
 BOARD_HEIGHT       = 20
 
 ; ****************************************************
@@ -68,10 +68,9 @@ GAME_STATE      .byte 4
 
 LEVEL           .byte 1
 
-
-START_BOARD     = (BOARD + (40*5 + (40-BOARD_WIDTH)/2 + 1)*2)
-NEXT_PIECE_LOC  = (BOARD + (40*11 + 32)*2)
-PIECE_VALUE     = $25  ; we're doing BCD additions
+START_TILEMAP     = (TILEMAP + (40*5 + (40-(BOARD_WIDTH+4))/2 + 1)*2)
+NEXT_PIECE_LOC    = (TILEMAP + (40*11 + 32)*2)
+PIECE_VALUE       = $25  ; we're doing BCD additions
 
 EFFECT_T_POSITION = $60 ; 4 bytes
 EFFECT_T_WAIT_CNTR= $64 ; 2 bytes
@@ -285,6 +284,8 @@ DISPLAY_BOARD_LOOP
                 ; does the piece fit in this position?
                 JSR DOES_PIECE_FIT
                 LDA PIECE_FIT
+                
+                
                 BEQ LOGIC_DONE
                 
                 ; if Y position is 0, then game over
@@ -295,7 +296,7 @@ DISPLAY_BOARD_LOOP
         NOT_GAME_OVER
                 ; set the piece in place
                 ;JSR PLAY_EFFECT_TILE_DOWN
-                ; this is no longer required - JSR COPY_PIECE - DRAW_PIECE does it all on F256
+                JSR COPY_PIECE ; copy the piece into the board
                 
                 SED
                 CLC
@@ -357,7 +358,7 @@ DISPLAY_BOARD_LOOP
                 STA GAME_SPEED
                 
     LOGIC_DONE
-                ;JSR DRAW_FRAME ; I should not need to do this every refresh
+                JSR DRAW_BOARD ; we need to blank the board to redraw the piece
                 JSR DRAW_PIECE
                 JSR DRAW_HI_SCORES
                 JSR DRAW_SCORE
@@ -385,15 +386,68 @@ PICK_NEXT_PIECE
 ; * Look for lines
 ; *******************************************************************
 LOOK_FOR_LINES
-	BRA CHK_NEXT_LINE
-                RTS
+                STZ ROT_VAL2 ; line count max 4
+                STZ LINE_CNTR
+                STZ LINE_CNTR + 1
+    INIT_LINE_CHECK
+                LDY #0
+                STZ ROT_VAL  ; column count max 10
                 
+                ; calculate the position of the piece in the board
+                LDA PIECE_Y
+                DEC A
+                STA MULU_A
+                STZ MULU_A + 1
+                LDA #BOARD_WIDTH
+                STA MULU_B
+                STZ MULU_B + 1
+                ; store the result into CURSORPOS
+                LDA MULU_RES
+                STA ADDER_A
+                LDA MULU_RES + 1
+                STA ADDER_A + 1
+                LDA #<BOARD
+                STA ADDER_B
+                LDA #>BOARD
+                STA ADDER_B + 1
+                LDA ADDER_RES
+                STA CURSORPOS
+                LDA ADDER_RES + 1
+                STA CURSORPOS + 1
+                
+    CHK_NEXT_COL
+                LDA (CURSORPOS),Y
+                BEQ CHK_NEXT_LINE
+                INC ROT_VAL
+                INY
+                CPY #BOARD_WIDTH
+                BNE CHK_NEXT_COL
+                
+                LDA ROT_VAL
+                CMP #BOARD_WIDTH
+                BEQ LINE_FOUND  ; if the count is 14 then we have a full line
+                
+    CHK_NEXT_LINE
+                INC ROT_VAL2
+                LDA PIECE_Y
+                INC A
+                STA PIECE_Y
+                CMP #BOARD_HEIGHT
+                BEQ LOOK_LINE_DONE
+                LDA ROT_VAL2
+                CMP #4
+                BNE INIT_LINE_CHECK
+    LOOK_LINE_DONE
+                RTS
+              
+    ; when a line is found, we're going to replace the tiles with "checkered tiles"
 	LINE_FOUND
 				BRA CHK_NEXT_LINE
 
 ; ****************************************************************416
 ; * Get Piece Value - TODO: rename to GET_TILE_VALUE
-; * X must contain the piece value multiplied by 16.
+; * X must contain the piece value multiplied by 16 plus an offset.
+; *   For example, the 4th offset of piece 5 would have X=$54
 ; * This is really way too complicated.  Store the rotations in memory
 ; *  and retrieve them.
 ; *******************************************************************     
@@ -535,75 +589,187 @@ ROTATE_PIECE
 				RTS
 
 ; **************************************************************************695
-; * Lock a piece into place
+; * Lock a piece into place in the board
 ; *****************************************************************************
-COPY_PIECE      ;removed on F256
+COPY_PIECE      
+                LDA CURRENT_PIECE
+                ASL A
+                ASL A
+                ASL A
+                ASL A
+                TAX
+                
+                LDA PIECE_Y
+                DEC A
+                STA MULU_A
+                STZ MULU_A+1
+                LDA #BOARD_WIDTH
+                STA MULU_B
+                STZ MULU_B+1
+                ; ignore the second byte of the multiplication
+                CLC
+                LDA MULU_RES
+                ADC PIECE_X
+                TAY
+                
+    NEXT_COPY
+                JSR GET_PIECE_VALUE
+                CMP #0
+                BEQ SKIP_COPY
+                
+                ; is the board occupied for this byte
+                PHX
+                PHY ; TYX
+                PLX
+                STA BOARD,X
+                PLX
+                
+        SKIP_COPY
+                INX
+                INY
+                TXA
+                AND #3
+                BNE NEXT_COPY
+                
+                TYA
+                CLC
+                ADC #BOARD_WIDTH
+                TAY
+                
+                TXA
+                AND #$F
+                BNE NEXT_COPY
+                
                 RTS
 
 ; **************************************************************************753
 ; * This is the tougher function.  Used to detect collisions.
 ; *****************************************************************************
 DOES_PIECE_FIT
+                LDA CURRENT_PIECE
+                ASL A
+                ASL A
+                ASL A
+                ASL A
+                TAX
+                
+                ; multiply the Py*BoardWidth+Px Max value is 200
+                LDA PIECE_Y
+                STA MULU_A
+                STZ MULU_A+1
+                LDA #BOARD_WIDTH
+                STA MULU_B
+                STZ MULU_B+1
+                
+                CLC
+                LDA MULU_RES
+                ADC PIECE_X
+                TAY
+                
+    NEXT_COLLISION
+                JSR GET_PIECE_VALUE
+                CMP #0   ; skip the empty tiles
+                BEQ SKIP_BYTE
+                
+                ; is the board occupied for this byte
+                PHX
+                PHY ; TYX
+                PLX
+                LDA BOARD,X
+                PLX
+                CMP #0
+                BNE OCCUPIED
+                
+                           
+    SKIP_BYTE
+                INX
+                INY
+                TXA
+                AND #3
+                BNE NEXT_COLLISION
+                
+                TYA
+                CLC
+                ADC #BOARD_WIDTH
+                TAY
+                
+                TXA
+                AND #$F
+                BNE NEXT_COLLISION
+                BRA PF_DONE
+                
+                ; passed the end of the board
+    OCCUPIED
+                LDA #1
+                STA PIECE_FIT
+    PF_DONE
                 RTS
 
 ; **************************************************************************819
-; draw the board as tiles
+; draw the board to the tilemap
 ; *****************************************************************************
-DRAW_FRAME
-                LDA #<START_BOARD
+DRAW_BOARD
+                LDA #<START_TILEMAP
                 STA CURSORPOS
-                LDA #>START_BOARD
+                LDA #>START_TILEMAP
                 STA CURSORPOS + 1
                 
-                LDX #0
-       -        LDA #1
+                STZ CURCOLOR  ; use this pointer to count the number of rows
+     DB_INNER   LDX #0
+                LDY #0
                 
+                LDA #1
+                STA (CURSORPOS),Y ; the tile
+                INY
+                INY
+                LDA #1
+                STA (CURSORPOS),Y ; the tile
+                INY
+                INY
                 
-                STA (CURSORPOS) ; the tile
-                LDY #2
+          -     LDA BOARD,X
                 STA (CURSORPOS),Y ; the tile
-                LDY #(BOARD_WIDTH -2) * 2
-                STA (CURSORPOS),Y ; the tile
-                LDY #(BOARD_WIDTH -1) * 2
-                STA (CURSORPOS),Y ; the tile
+                INX
+                INY
+                INY
+                CPX #BOARD_WIDTH
+                BNE - 
                 
-                LDA #0
-                LDY #1
-                STA (CURSORPOS),Y ; the tile control
-                LDY #3
+                LDA #1
                 STA (CURSORPOS),Y ; the tile
-                LDY #(BOARD_WIDTH -2) * 2 + 1
+                INY
+                INY
+                LDA #1
                 STA (CURSORPOS),Y ; the tile
-                LDY #(BOARD_WIDTH -1) * 2 + 1
-                STA (CURSORPOS),Y ; the tile
+                INY
+                INY
+                INC CURCOLOR ; increment the row count
                 
-                ; calculate the offset to the next row
+                ; calculate the offset to the next row of tiles
                 CLC
                 LDA CURSORPOS
-                ADC #40 * 2
+                ADC #40*2
                 STA CURSORPOS
                 BCC +
                 INC CURSORPOS + 1
                 
-         +      INX
+         +      LDX CURCOLOR
                 CPX #BOARD_HEIGHT
-                BNE -
+                BNE DB_INNER
                 
-                ; now draw the two bottom rows
+                ; now draw the two bottom row(s)
                 LDY #0
          -      LDA #1
                 STA (CURSORPOS),Y
                 INY
-                LDA #0
-                STA (CURSORPOS),Y
                 INY
-                CPY #BOARD_WIDTH * 2
+                CPY #(BOARD_WIDTH + 4) * 2
                 BNE -
                 
                 RTS
 
 ; **************************************************************************871
-; * Draw the piece in the board
+; * Draw the piece in the tilemap
 ; *****************************************************************************
 DRAW_PIECE
                 LDA CURRENT_PIECE
@@ -613,7 +779,7 @@ DRAW_PIECE
                 ASL A
                 TAX
                 
-                ; Put the StartBoard + Py*40*2 into cursorpos
+                ; Put the StartTilemap + Py*40*2 into cursorpos
                 LDA PIECE_Y
                 STA MULU_A
                 STZ MULU_A + 1
@@ -625,9 +791,9 @@ DRAW_PIECE
                 STA ADDER_A
                 LDA MULU_RES+1
                 STA ADDER_A + 1
-                LDA #<START_BOARD
+                LDA #<START_TILEMAP
                 STA ADDER_B
-                LDA #>START_BOARD
+                LDA #>START_TILEMAP
                 STA ADDER_B+1
                 
                 LDA ADDER_RES
@@ -640,18 +806,14 @@ DRAW_PIECE
                 ASL A
                 TAY 
                 
-    NEXT_COPY
+    DP_NEXT_PIECE_SYMBOL
                 JSR GET_PIECE_VALUE
                 CMP #0
-                BEQ SKIP_COPY
+                BEQ SKIP_DRAW
                 
-                ; is the board occupied for this byte
-                ;PHX
-                ;TYX
                 STA (CURSORPOS),Y
-                ;PLX
                 
-        SKIP_COPY
+        SKIP_DRAW
                 INX
                 INY
                 LDA #0
@@ -660,7 +822,7 @@ DRAW_PIECE
                 ; we have to copy 4 tiles per row
                 TXA
                 AND #3
-                BNE NEXT_COPY
+                BNE DP_NEXT_PIECE_SYMBOL
                 
                 ; draw into the next row
                 CLC
@@ -678,7 +840,7 @@ DRAW_PIECE
                 RTS
                 
 ; ************************************************************932
-; * Draw Next Piece to the right of the board.
+; * Draw Next Piece to the right of the tilemap.
 ; * Since the tiles are 8x8, we could probably replace
 ; * with sprites, but this would use more memory.
 ; ***************************************************************
@@ -888,7 +1050,7 @@ GAME_OVER
 				RTS
                 
 ; *************************************************************************1386
-; * Display Hex value at CursorPos, with color CURCOLOR
+; * Display Hex value at CURSORPOS, with color CURCOLOR
 ; * Value to display is in A
 ; *****************************************************************************  
 DISPLAY_HEX
@@ -1004,13 +1166,15 @@ LOAD_GAME_ASSETS
                 STZ VKY_TILEMAP1_SCR_X
                 STZ VKY_TILEMAP1_SCR_Y
                 
-                LDA #<BOARD
+                ; set the tilemap 0 address
+                LDA #<TILEMAP
                 STA VKY_TILEMAP0_AD
-                LDA #>BOARD
+                LDA #>TILEMAP
                 STA VKY_TILEMAP0_AD + 1
-                LDA #`BOARD
+                LDA #`TILEMAP
                 STA VKY_TILEMAP0_AD + 2
                 
+                ; set the tilemap 1 address
                 LDA #<INTRO_TILEMAP
                 STA VKY_TILEMAP1_AD
                 LDA #>INTRO_TILEMAP
@@ -1051,16 +1215,14 @@ INIT_GAME
                 LDA #1
                 STA LEVEL
                 
-                ; clear tileset
-                dma_fill 0, BOARD, 40*30*2
+                ; clear board and tilemap
+                dma_fill 0, BOARD, BOARD_WIDTH*BOARD_HEIGHT + 40*30*2
                 
                 ; enable the board tiles
                 LDA #VKY_TILEMAP_EN | VKY_TILEMAP_8
                 STA VKY_TILEMAP0_CTRL
                 ; disable the intro tiles
                 STZ VKY_TILEMAP1_CTRL
-                
-                JSR DRAW_FRAME
                 
                 ; load the play music
                 ; LDA #`VGM_PLAY_MUSIC
@@ -1178,7 +1340,6 @@ DISPLAY_INTRO
 ; *****************************************************************************
 ; * variables
 ; *****************************************************************************
-HEX_VALUES      .text '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'
 BONUS           .text 0,1,3,6,$10 ; these are BCD values
 GAME_OVER_MSG   .text 'GAME OVER',0
 SCORE_MSG       .text 'SCORE:',0
@@ -1240,7 +1401,10 @@ PIECE6
     .byte 0,0,0,0
 
 BOARD
-    .fill 40*30*2  ; the board is 40 x 30 - each tile is 2 bytes
+    .fill BOARD_HEIGHT*BOARD_WIDTH, 0
+
+TILEMAP
+    .fill 40*30*2, 0  ; the board is 40 x 30 - each tile is 2 bytes
       
 HI_SCORES
     .text 'DAN   ',0
