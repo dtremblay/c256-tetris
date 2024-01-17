@@ -3,8 +3,8 @@
 ; * Author Daniel Tremblay
 ; * Code written for the C256 Foenix retro computer
 ; * Permission is granted to reuse this code to create your own games
-; * for the C256 Foenix.
-; * Copyright Daniel Tremblay 2020
+; * for the F256 Foenix.
+; * Copyright Daniel Tremblay 2020-2024
 ; * This code is provided without warranty.
 ; * Please attribute credits to Daniel Tremblay if you reuse.
 ; ****************************************************************************
@@ -33,35 +33,63 @@ VGM_OFFSET        = $34 ; 32-bits
 ; VGM Registers
 COMMAND           = $7F ; 1 byte
 
-PCM_OFFSET        = $8A ; 4 bytes
+;PCM_OFFSET        = $8A ; 4 bytes
 
 AY_3_8910_A       = $90 ; 2 bytes
 AY_3_8910_B       = $92 ; 2 bytes
 AY_3_8910_C       = $94 ; 2 bytes
 AY_3_8910_N       = $96 ; 2 bytes
 
-DATA_STREAM_CNT   = $7D ; 2 byte
-DATA_STREAM_TBL   = $8000 ; each entry is 4 bytes
+;DATA_STREAM_CNT   = $7D ; 2 byte
+;DATA_STREAM_TBL   = $8000 ; each entry is 4 bytes
+
+; *******************************************************************
+; * MACROS
+; *******************************************************************
+; Increment the song address.  We need to ensure we stay 
+; within the slot bounds.
+;
+; first parameter is the address to incremented
+; second parameter is the number of bytes to skip
+; third parameter is the max hi byte
+; fourth paramter is the min hi byte
+increment_long_addr   .macro
+            CLC
+            LDA \1
+            ADC #\2
+            STA \1
+            BCC skip_n_done
+            
+            LDA \1 + 1
+            ADC #0
+            STA \1 + 1
+            CMP \3 ; if we get to the upper bound, switch the slot
+            BLT skip_n_done
+            
+            
+            LDA #\4
+            STA \1 + 1
+            ; switch the slot to the next area in memory
+            LDA #80
+            STA MMU_MEM_CTRL
+            
+            LDA CURRENT_POSITION + 2
+            INC A
+            STA 8+2  ; slot 2
+            LDA #0
+            STA MMU_MEM_CTRL
+
+    skip_n_done
+            .endm
 
 ; *******************************************************************
 ; * Interrupt driven sub-routine.
 ; *******************************************************************
 VGM_WRITE_REGISTER
-            LDX WAIT_CNTR
-            CPX #0
-            BEQ READ_COMMAND
-            
-            DEX
-            STX WAIT_CNTR
-            
-            RTS
-            
-    READ_COMMAND
-            LDA #0
-            XBA
-            LDA [CURRENT_POSITION]
+            LDA (CURRENT_POSITION)
             STA COMMAND
-            increment_long_addr CURRENT_POSITION
+            
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             
             AND #$F0
             LSR A
@@ -91,81 +119,40 @@ VGM_COMMAND_TABLE
             .word <>SKIP_TWO_BYTES  ;B - not implemented
             .word <>SKIP_THREE_BYTES;C - not implemented
             .word <>SKIP_THREE_BYTES;D - not implemented
-            .word <>SEEK_OFFSET     ;E - not implemented
+            .word <>SKIP_FOUR_BYTES ;E - not implemented
             .word <>SKIP_FOUR_BYTES ;F - not implemented
             
 INVALID_COMMAND
             JMP VGM_WRITE_REGISTER
-
-; first parameter is the address to incremented
-; second parameter is the number of bytes to skip
-increment_long_addr 
-            .macro
-            CLC
-            LDA \1
-            ADC #\2
-            STA \1
-            BCC skip_n_done
             
-            LDA \1 + 1
-            ADC #0
-            STA \1 + 1
-            BCC skip_n_done
+restart_timer0      .macro
+            LDA #0    ; set timer0 charge to 0
+            STA TIMER0_CHARGE
+            STA TIMER0_CHARGE + 1
+            STA TIMER0_CHARGE + 2
             
-            LDA \1 + 2
-            ADC #0
-            STA \1 + 2
-            BCC skip_n_done
+            LDA #TMR_CMP_RECLR  ; count up from "CHARGE" value to TIMER_CMP
+            STA TIMER0_CMP_REG
             
-            LDA \1 + 3
-            ADC #0
-            STA \1 + 3
-
-    skip_n_done
-            .endm
+            LDA #(TMR_EN | TMR_UPDWN | TMR_SCLR )
+            STA TIMER0_CTRL_REG
+                    .endm
             
 SKIP_BYTE_CMD
-            increment_long_addr CURRENT_POSITION, 1
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
+            JMP VGM_WRITE_REGISTER
+            
+SKIP_TWO_BYTES
+            increment_long_addr CURRENT_POSITION,2,>SLOT3,>SLOT2
+            JMP VGM_WRITE_REGISTER
+            
+SKIP_THREE_BYTES
+            increment_long_addr CURRENT_POSITION,3,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
             
 SKIP_FOUR_BYTES
-            increment_long_addr CURRENT_POSITION, 4
+            increment_long_addr CURRENT_POSITION,4,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
-
-SEEK_OFFSET
-            .as
-            LDA COMMAND
-            CMP #$E0
-            BNE SKIP_FOUR_BYTES
-            
-            ; read 4 bytes, add them to the databank 0 offset
-            ; and store in the PCM_OFFSET
-            LDA [CURRENT_POSITION]
-            STA ADDER_A
-            LDA [CURRENT_POSITION+1]
-            STA ADDER_A + 1
-            LDA [CURRENT_POSITION+2]
-            STA ADDER_A + 2
-            LDA [CURRENT_POSITION+3]
-            STA ADDER_A + 3
-            
-            increment_long_addr CURRENT_POSITION,4
-            
-            LDA DATA_STREAM_TBL
-            STA ADDER_B
-            LDA DATA_STREAM_TBL + 1
-            STA ADDER_B + 1
-            LDA DATA_STREAM_TBL + 2
-            STA ADDER_B + 2
-            LDA DATA_STREAM_TBL + 3
-            STA ADDER_B + 3
-            
-            LDA ADDER_R
-            STA PCM_OFFSET
-            LDA ADDER_R + 2
-            STA PCM_OFFSET + 2
-            
-            JMP VGM_LOOP_DONE
             
 
 ; we need to combine R1 and R0 together before we send
@@ -179,8 +166,8 @@ AY8910
             
     AY_COMMAND
             ; the second byte is the register
-            LDA [CURRENT_POSITION]
-            increment_long_addr CURRENT_POSITION,1
+            LDA (CURRENT_POSITION)
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             CMP #0 ; Register 0 fine
             BNE AY_R1
             
@@ -192,30 +179,32 @@ AY8910
             STA PSG_BASE_ADDRESS
             LDA #$3F
             STA PSG_BASE_ADDRESS
-            increment_long_addr CURRENT_POSITION,1
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
             
         R0_FINE
-            XBA
-            LDA [CURRENT_POSITION]
-            increment_long_addr CURRENT_POSITION,1
+            ; this is a two-byte operation - TODO: review this code.
+            STA VGM_TEMP
             
-            setal
+            LDA (CURRENT_POSITION)
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             LSR A ; drop the LSB
-            setas
-            PHA
+            ;BBR 0,VGM_TEMP,+
+            .byte $0f, $8c, $02
+            
+            ORA #$80
+            
+      +     PHA
             AND #$F
             ORA #$80
             STA PSG_BASE_ADDRESS
             
             PLA
-            setal
             LSR A
             LSR A
             LSR A
             LSR A
-            setas
-            
+            ; TODO: add the low-nibble from VGM_TEMP into hi-nibble
             AND #$3F ; 6 bits
 
             STA PSG_BASE_ADDRESS
@@ -225,8 +214,8 @@ AY8910
     AY_R1   CMP #1
             BNE AY_R2
             
-            LDA [CURRENT_POSITION]
-            increment_long_addr CURRENT_POSITION
+            LDA (CURRENT_POSITION)
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             AND #$F
             STA AY_3_8910_A
             
@@ -243,30 +232,31 @@ AY8910
             STA PSG_BASE_ADDRESS
             LDA #$3F
             STA PSG_BASE_ADDRESS
-            increment_long_addr CURRENT_POSITION
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
             
         R1_FINE
-            XBA
-            LDA [CURRENT_POSITION]
-            increment_long_addr CURRENT_POSITION
-            
-            setal
+            ; this is a two-byte operation
+            ;XBA
+            STA VGM_TEMP
+            LDA (CURRENT_POSITION)
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             LSR A ; drop the LSB
-            setas
+            ;BBR 0,VGM_TEMP,+
+            .byte $0f, $8c, $02
+            ORA #$80
             
-            PHA
+     +      PHA
             AND #$F
             ORA #$A0
             STA PSG_BASE_ADDRESS
             
             PLA
-            setal
             LSR A
             LSR A
             LSR A
             LSR A
-            setas
+            ; TODO: add the low-nibble from VGM_TEMP into hi-nibble
             AND #$3F ; 6 bits
 
             STA PSG_BASE_ADDRESS
@@ -275,8 +265,8 @@ AY8910
     AY_R3   CMP #3
             BNE AY_R4
             
-            LDA [CURRENT_POSITION]
-            increment_long_addr CURRENT_POSITION
+            LDA (CURRENT_POSITION)
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             AND #$F
             STA AY_3_8910_B
             
@@ -293,30 +283,32 @@ AY8910
             STA PSG_BASE_ADDRESS
             LDA #$3F
             STA PSG_BASE_ADDRESS
-            increment_long_addr CURRENT_POSITION
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
             
         R2_FINE
-            XBA
-            LDA [CURRENT_POSITION]
-            increment_long_addr CURRENT_POSITION
+            ; this is a two-byte operation - TODO: review this code
+            ;XBA
+            STA VGM_TEMP
+            LDA (CURRENT_POSITION)
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             
-            setal
             LSR A ; drop the LSB
-            setas
+            ;BBR 0,VGM_TEMP,+
+            .byte $0f, $8c, $02
+            ORA #$80
             
-            PHA
+     +      PHA
             AND #$F
             ORA #$C0
             STA PSG_BASE_ADDRESS
             
             PLA
-            setal
             LSR A
             LSR A
             LSR A
             LSR A
-            setas
+            ; TODO: add the low-nibble from VGM_TEMP into hi-nibble
             AND #$3F ; 6 bits
 
             STA PSG_BASE_ADDRESS
@@ -325,8 +317,8 @@ AY8910
     AY_R5   CMP #5
             BNE AY_R10
             
-            LDA [CURRENT_POSITION]
-            increment_long_addr CURRENT_POSITION
+            LDA (CURRENT_POSITION)
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             AND #$F
             STA AY_3_8910_C
             
@@ -338,8 +330,8 @@ AY8910
             
             LDA #$F
             SEC
-            SBC [CURRENT_POSITION]
-            increment_long_addr CURRENT_POSITION
+            SBC (CURRENT_POSITION)
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             AND #$F
             ORA #$90
             STA PSG_BASE_ADDRESS
@@ -351,8 +343,8 @@ AY8910
             
             LDA #$F
             SEC
-            SBC [CURRENT_POSITION]
-            increment_long_addr CURRENT_POSITION
+            SBC (CURRENT_POSITION)
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             
             AND #$F
             ORA #$B0
@@ -365,15 +357,15 @@ AY8910
             
             LDA #$F
             SEC
-            SBC [CURRENT_POSITION]
-            increment_long_addr CURRENT_POSITION
+            SBC (CURRENT_POSITION)
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             AND #$F
             ORA #$D0
             STA PSG_BASE_ADDRESS
             JMP VGM_WRITE_REGISTER
             
     AY_R15
-            increment_long_addr CURRENT_POSITION
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
 
 ; *******************************************************************
@@ -383,12 +375,13 @@ WRITE_YM_CMD
             .as
             LDA COMMAND
 
+            ; should use a Jump Table to speed this up
             CMP #$50
             BNE CHK_YM2413
             
-            LDA [CURRENT_POSITION]
+            LDA (CURRENT_POSITION)
             STA PSG_BASE_ADDRESS
-            increment_long_addr CURRENT_POSITION
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_LOOP_DONE ; for some reason, this chip needs more time between writes
             
         CHK_YM2413
@@ -396,17 +389,14 @@ WRITE_YM_CMD
             BNE CHK_YM2612_P0
             
             ; the second byte is the register
-            LDA #0
-            XBA
-            LDA [CURRENT_POSITION]
-            TAX
-            increment_long_addr CURRENT_POSITION
+            LDA (CURRENT_POSITION)
+            STA OPL3_BASE_ADRESS
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             
             ; the third byte is the value to write in the register
-            LDA [CURRENT_POSITION]
-            STA @lOPL3_BASE_ADRESS,X
-            ;STA @lOPN2_BASE_ADDRESS,X  ; this probably won't work
-            increment_long_addr CURRENT_POSITION
+            LDA (CURRENT_POSITION)
+            STA OPL3_BASE_ADRESS+1
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
             
         CHK_YM2612_P0
@@ -414,16 +404,14 @@ WRITE_YM_CMD
             BNE CHK_YM2612_P1
             
             ; the second byte is the register
-            LDA #0
-            XBA
-            LDA [CURRENT_POSITION]
-            TAX
-            increment_long_addr CURRENT_POSITION
+            ;LDA (CURRENT_POSITION)
+            ;TAX
+            increment_long_addr CURRENT_POSITION,2,>SLOT3,>SLOT2
             
             ; the third byte is the value to write in the register
-            LDA [CURRENT_POSITION]
-            STA @lOPN2_BASE_ADDRESS,X
-            increment_long_addr CURRENT_POSITION
+            ;LDA (CURRENT_POSITION)
+            ;STA OPN2_BASE_ADDRESS,X
+            ;increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_LOOP_DONE ; for some reason, this chip needs more time between writes
             
         CHK_YM2612_P1
@@ -431,16 +419,14 @@ WRITE_YM_CMD
             BNE CHK_YM2151
             
             ; the second byte is the register
-            LDA #0
-            XBA
-            LDA [CURRENT_POSITION]
-            TAX
-            increment_long_addr CURRENT_POSITION
+            ;LDA (CURRENT_POSITION)
+            ;TAX
+            increment_long_addr CURRENT_POSITION,2,>SLOT3,>SLOT2
             
             ; the third byte is the value to write in the register
-            LDA [CURRENT_POSITION]
-            STA @lOPN2_BASE_ADDRESS + $100,X
-            increment_long_addr CURRENT_POSITION
+            ;LDA (CURRENT_POSITION)
+            ;STA OPN2_BASE_ADDRESS + $100,X
+            ;increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_LOOP_DONE ; for some reason, this chip needs more time between writes
             
         CHK_YM2151
@@ -448,16 +434,14 @@ WRITE_YM_CMD
             BNE CHK_YM2203
             
             ; the second byte is the register
-            LDA #0
-            XBA
-            LDA [CURRENT_POSITION]
-            TAX
-            increment_long_addr CURRENT_POSITION
+            ;LDA (CURRENT_POSITION)
+            ;TAX
+            increment_long_addr CURRENT_POSITION,2,>SLOT3,>SLOT2
             
             ; the third byte is the value to write in the register
-            ;LDA [CURRENT_POSITION]
-            ;STA @lOPM_BASE_ADDRESS,X
-            increment_long_addr CURRENT_POSITION
+            ;LDA (CURRENT_POSITION)
+            ;STA OPM_BASE_ADDRESS,X
+            ;increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
             
         CHK_YM2203
@@ -465,16 +449,15 @@ WRITE_YM_CMD
             BNE CHK_YM2608_P0
             
             ; the second byte is the register
-            LDA #0
-            XBA
-            LDA [CURRENT_POSITION]
-            TAX
-            increment_long_addr CURRENT_POSITION
+            ;LDA (CURRENT_POSITION)
+            ;TAX
+            increment_long_addr CURRENT_POSITION,2,>SLOT3,>SLOT2
             
             ; the third byte is the value to write in the register
-            LDA [CURRENT_POSITION]
+            ;LDA (CURRENT_POSITION)
             ;STA @lOPM_BASE_ADDRESS,X
-            increment_long_addr CURRENT_POSITION
+            
+            ;increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
             
         CHK_YM2608_P0
@@ -482,21 +465,19 @@ WRITE_YM_CMD
             BNE CHK_YM2608_P1
             
             ; the second byte is the register
-            LDA #0
-            XBA
-            LDA [CURRENT_POSITION]
+            LDA (CURRENT_POSITION)
             CMP #$10  ; if the register is 0 to $1F, process as SSG
             BGE YM2608_FM
             JMP AY8910
 
         YM2608_FM
             TAX
-            increment_long_addr CURRENT_POSITION
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             
             ; the third byte is the value to write in the register
-            LDA [CURRENT_POSITION]
-            STA @lOPN2_BASE_ADDRESS,X
-            increment_long_addr CURRENT_POSITION
+            ;LDA (CURRENT_POSITION)
+            ;STA OPN2_BASE_ADDRESS,X
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
             
         CHK_YM2608_P1
@@ -504,16 +485,14 @@ WRITE_YM_CMD
             BNE CHK_YM2610_P0
             
             ; the second byte is the register
-            LDA #0
-            XBA
-            LDA [CURRENT_POSITION]
-            TAX
-            increment_long_addr CURRENT_POSITION
+            ;LDA (CURRENT_POSITION)
+            ;TAX
+            increment_long_addr CURRENT_POSITION,2,>SLOT3,>SLOT2
             
             ; the third byte is the value to write in the register
-            LDA [CURRENT_POSITION]
-            STA @lOPN2_BASE_ADDRESS,X
-            increment_long_addr CURRENT_POSITION
+            ;LDA (CURRENT_POSITION)
+            ;STA OPN2_BASE_ADDRESS,X
+            ;increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
             
         CHK_YM2610_P0
@@ -521,21 +500,19 @@ WRITE_YM_CMD
             BNE CHK_YM2610_P1
             
             ; the second byte is the register
-            LDA #0
-            XBA
-            LDA [CURRENT_POSITION]
+            LDA (CURRENT_POSITION)
             CMP #$10  ; if the register is 0 to $1F, process as SSG
             BGE YM2610_FM
             JMP AY8910
             
         YM2610_FM
-            TAX
-            increment_long_addr CURRENT_POSITION
+            ;TAX
+            increment_long_addr CURRENT_POSITION,2,>SLOT3,>SLOT2
             
             ; the third byte is the value to write in the register
-            LDA [CURRENT_POSITION]
-            STA @lOPN2_BASE_ADDRESS,X
-            increment_long_addr CURRENT_POSITION
+            ;LDA (CURRENT_POSITION)
+            ;STA OPN2_BASE_ADDRESS,X
+            ;increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
             
         CHK_YM2610_P1
@@ -543,16 +520,14 @@ WRITE_YM_CMD
             BNE CHK_YM3812
             
             ; the second byte is the register
-            LDA #0
-            XBA
-            LDA [CURRENT_POSITION]
-            TAX
-            increment_long_addr CURRENT_POSITION
+            ;LDA (CURRENT_POSITION)
+            ;TAX
+            increment_long_addr CURRENT_POSITION,2,>SLOT3,>SLOT2
             
             ; the third byte is the value to write in the register
-            LDA [CURRENT_POSITION]
-            STA @lOPN2_BASE_ADDRESS + $100,X
-            increment_long_addr CURRENT_POSITION
+            ;LDA (CURRENT_POSITION)
+            ;STA OPN2_BASE_ADDRESS + $100,X
+            ;increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
             
         CHK_YM3812
@@ -560,16 +535,14 @@ WRITE_YM_CMD
             BNE CHK_YM262_P0
             
             ; the second byte is the register
-            LDA #0
-            XBA
-            LDA [CURRENT_POSITION]
-            TAX
-            increment_long_addr CURRENT_POSITION
+            LDA (CURRENT_POSITION)
+            STA OPL3_BASE_ADRESS
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             
             ; the third byte is the value to write in the register
-            LDA [CURRENT_POSITION]
-            STA @lOPL3_BASE_ADRESS,X
-            increment_long_addr CURRENT_POSITION
+            LDA (CURRENT_POSITION)
+            STA OPL3_BASE_ADRESS+1
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
         
         CHK_YM262_P0
@@ -577,16 +550,14 @@ WRITE_YM_CMD
             BNE CHK_YM262_P1
             
             ; the second byte is the register
-            LDA #0
-            XBA
-            LDA [CURRENT_POSITION]
-            TAX
-            increment_long_addr CURRENT_POSITION
+            LDA (CURRENT_POSITION)
+            STA OPL3_BASE_ADRESS
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             
             ; the third byte is the value to write in the register
-            LDA [CURRENT_POSITION]
-            STA @lOPL3_BASE_ADRESS,X
-            increment_long_addr CURRENT_POSITION
+            LDA (CURRENT_POSITION)
+            STA OPL3_BASE_ADRESS+1
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
             
         CHK_YM262_P1
@@ -594,16 +565,14 @@ WRITE_YM_CMD
             BNE YM_DONE
             
             ; the second byte is the register
-            LDA #0
-            XBA
-            LDA [CURRENT_POSITION]
-            TAX
-            increment_long_addr CURRENT_POSITION
+            LDA (CURRENT_POSITION)
+            STA OPL3_BASE_ADRESS
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             
             ; the third byte is the value to write in the register
-            LDA [CURRENT_POSITION]
-            STA @lOPL3_BASE_ADRESS+ $100,X
-            increment_long_addr CURRENT_POSITION
+            LDA (CURRENT_POSITION)
+            STA OPL3_BASE_ADRESS+2
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
     YM_DONE
             JMP VGM_WRITE_REGISTER
 
@@ -614,30 +583,56 @@ WAIT_COMMANDS
             .as
             LDA COMMAND
             CMP #$61
-            BNE CHK_WAIT_60th
-            setal
-            LDA [CURRENT_POSITION]
-            TAX
-            STX WAIT_CNTR
-            setas
-            increment_long_addr CURRENT_POSITION
-            increment_long_addr CURRENT_POSITION
+            BEQ +
+            JMP CHK_WAIT_60th
+            
+       +    LDA (CURRENT_POSITION)
+            STA MULU_A
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
+            LDA (CURRENT_POSITION)
+            STA MULU_A + 1
+            increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
+            LDA #$<145
+            STA MULU_B
+            LDA #$>145
+            STA MULU_B + 1
+            
+            LDA MULU_RES
+            STA TIMER0_CMP
+            LDA MULU_RES + 1
+            STA TIMER0_CMP + 1
+            LDA MULU_RES + 2
+            STA TIMER0_CMP + 2
+            restart_timer0
+            
             JMP VGM_LOOP_DONE
             
         CHK_WAIT_60th
             CMP #$62
             BNE CHK_WAIT_50th
             
-            LDX #$2df
-            STX WAIT_CNTR
+            ; 1/60th of a second = $3_A51B timer charge
+            LDA #<$A51B
+            STA TIMER0_CMP
+            LDA #>$A51B
+            STA TIMER0_CMP + 1
+            LDA #3
+            STA TIMER0_CMP + 2
+            restart_timer0
             JMP VGM_LOOP_DONE
             
         CHK_WAIT_50th
             CMP #$63
             BNE CHK_END_SONG
             
-            LDX #$372
-            STX WAIT_CNTR
+            ; 1/50th of a second = $4_5FBA timer charge
+            LDA #<$5FBA
+            STA TIMER0_CMP
+            LDA #>$5FBA
+            STA TIMER0_CMP + 1
+            LDA #4
+            STA TIMER0_CMP + 2
+            restart_timer0
             JMP VGM_LOOP_DONE
 
         CHK_END_SONG
@@ -659,143 +654,149 @@ WAIT_COMMANDS
 ; * Wait N+1 Commands
 ; *******************************************************************
 WAIT_N_1
-            .as
-            LDA #0
-            XBA
             LDA COMMAND
             AND #$F
-            TAX
-            INX ; $7n where we wait n+1
-            STX WAIT_CNTR
+            INC A
+            
+            STA MULU_A
+            STZ MULU_A + 1
+            
+            ; this assumes a sampling rate of 44kHz - TODO read the sampling rate in the VGM file
+            LDA #$<145
+            STA MULU_B
+            LDA #$>145
+            STA MULU_B + 1
+            
+            LDA MULU_RES
+            STA TIMER0_CMP
+            LDA MULU_RES + 1
+            STA TIMER0_CMP + 1
+            LDA MULU_RES + 2
+            STA TIMER0_CMP + 2
+            
+            restart_timer0
             JMP VGM_LOOP_DONE
             
 ; *******************************************************************
 ; * Play Samples and wait N
 ; *******************************************************************
 YM2612_SAMPLE
-            .as
+            ; .as
             
-            ; write directly to YM2612 DAC then wait n
-            ; load a value from database
-            LDA [PCM_OFFSET]
-            STA OPN2_BASE_ADDRESS + $2A
+            ; ; write directly to YM2612 DAC then wait n
+            ; ; load a value from database
+            ; LDA [PCM_OFFSET]
+            ; STA OPN2_BASE_ADDRESS + $2A
             
-            ; increment PCM_OFFSET
-            setal
-            LDA PCM_OFFSET
-            INC A
-            STA PCM_OFFSET
-            BCC YMS_WAIT
-            LDA PCM_OFFSET + 2
-            INC A
-            STA PCM_OFFSET + 2
+            ; ; increment PCM_OFFSET
+            ; setal
+            ; LDA PCM_OFFSET
+            ; INC A
+            ; STA PCM_OFFSET
+            ; BCC YMS_WAIT
+            ; LDA PCM_OFFSET + 2
+            ; INC A
+            ; STA PCM_OFFSET + 2
             
-    YMS_WAIT
-            setas
-            LDA #0
-            XBA
-            LDA COMMAND
-            ; this is the wait part
-            AND #$F
-            TAX
-            STX WAIT_CNTR
-            ;CPX #0
-            ;BNE YMS_NOT_ZERO
+    ; YMS_WAIT
+            ; setas
+            ; LDA #0
+            ; XBA
+            ; LDA COMMAND
+            ; ; this is the wait part
+            ; AND #$F
+            ; TAX
+            ; STX WAIT_CNTR
             
-            ;RTS
-            
-    YMS_NOT_ZERO
+    ; YMS_NOT_ZERO
             JMP VGM_WRITE_REGISTER
             
 ; *******************************************************************
 ; * Don't know yet
 ; *******************************************************************
 DAC_STREAM
-            .as
-
             ;JMP VGM_LOOP_DONE
             JMP VGM_WRITE_REGISTER
 
-
-VGM_SET_SONG_POINTERS
-            .as
-            
+; *******************************************************************
+; * Copy the song offset pointer to CURRENT_POSITION
+; *******************************************************************
+VGM_SET_SONG_POINTERS           
             ; add the start offset
-            setal
-            LDA #0
-            STA WAIT_CNTR
-            LDA SONG_START + 2
+            LDA SONG_START + 2         ; for the F256K, this is the slot #
             STA CURRENT_POSITION + 2
-            CLC
+            
+   NO_LOOP_INFO
+            ; compute song_start + vgm_offset + song_offset
             LDY #VGM_OFFSET
-            LDA [SONG_START],Y
+            LDA (SONG_START),Y
+            CLC
             ADC #VGM_OFFSET
-            ADC SONG_START
+            STA ADDER_A
+            
+            ; second byte
+            INC Y
+            LDA (SONG_START),Y
+            STA ADDER_A + 1
+            BCC +
+            INC ADDER_A + 1
+            
+       +    LDA SONG_START
+            STA ADDER_B
+            LDA SONG_START + 1
+            STZ ADDER_B + 1
+            
+            LDA ADDER_RES
             STA CURRENT_POSITION
-            BCC VSP_DONE
-            
-            INC CURRENT_POSITION + 2
-    VSP_DONE
-            
-            setas
+            LDA ADDER_RES + 1
+            STA CURRENT_POSITION +1
             
             RTS
 
+; *******************************************************************
+; * Set CURRENT_POSITION to LOOP_OFFSET
+; *******************************************************************
 VGM_SET_LOOP_POINTERS
-            .as
-            
-            ; add the start offset
-            setal
-            LDA #0
-            STA WAIT_CNTR
-            
-            
-            CLC
+            ; check if loop offset is zero
             LDY #LOOP_OFFSET
-            LDA [SONG_START],Y
-            BEQ NO_LOOP_INFO ; if this is zero, assume that the upper word is also 0
+            LDA (SONG_START),Y
+            BNE +
             
+            INY
+            LDA (SONG_START),Y
+            BNE +
+            JMP NO_LOOP_INFO ; if this is zero, assume that the upper word is also 0
+            
+       +    ; add the loop offset
+            LDY #LOOP_OFFSET
+            CLC
+            LDA (SONG_START),Y
             ADC #LOOP_OFFSET ; add the current position
             STA ADDER_A
-            INY
-            INY
-            LDA [SONG_START],Y
-            STA ADDER_A + 2
             
-            LDA SONG_START
+            ; second byte
+            INY
+            LDA (SONG_START),Y
+            STA ADDER_A + 1
+            BCC +
+            INC ADDER_A + 1
+            
+      +     LDA SONG_START
             STA ADDER_B
-            LDA SONG_START + 2
-            STA ADDER_B + 2
-            LDA ADDER_R
+            LDA SONG_START + 1
+            STA ADDER_B + 1
+            LDA ADDER_RES
             STA CURRENT_POSITION
-            LDA ADDER_R + 2
-            STA CURRENT_POSITION + 2
-            
-            BRA VSL_DONE
-            
-    NO_LOOP_INFO
-            
-            LDY #VGM_OFFSET
-            LDA [SONG_START],Y
-            ADC #VGM_OFFSET
-
-            ADC SONG_START
-            STA CURRENT_POSITION
-            LDA SONG_START + 2
-            STA CURRENT_POSITION + 2
-            
-            BCC VSL_DONE
-            INC CURRENT_POSITION + 2
-    VSL_DONE
-            setas
+            LDA ADDER_RES + 1
+            STA CURRENT_POSITION + 1
             
             RTS
 
-            
+; the game uses two timers:
+; * timer0 is for the music
+; * timer1 is for the effects
 VGM_INIT_TIMERS
-            .as
-            
-            LDA #$44
+            LDA #64
             STA TIMER0_CMP
             STA TIMER1_CMP
             LDA #1
@@ -805,7 +806,7 @@ VGM_INIT_TIMERS
             STA TIMER0_CMP+2
             STA TIMER1_CMP+2
             
-            LDA #0    ; set timer0 charge to 0
+            LDA #0    ; set timer0 and timer1 charge to 0
             STA TIMER0_CHARGE
             STA TIMER0_CHARGE+1
             STA TIMER0_CHARGE+2
@@ -825,59 +826,60 @@ VGM_INIT_TIMERS
             
 ; *******************************************************************************
 ; * Read a data block   - 67 66 tt ss ss ss ss
+; * Probably should not be using sampling on the F256
 ; *******************************************************************************
 READ_DATA_BLOCK
-            .as
-            LDA [CURRENT_POSITION] ; should be 66
-            ;CMP #$66 ; what happens if it's not 66?
-            increment_long_addr CURRENT_POSITION
-            LDA  [CURRENT_POSITION] ; should be the type - I expect $C0
-            PHA
-            increment_long_addr CURRENT_POSITION
+            ; .as
+            ; LDA [CURRENT_POSITION] ; should be 66
+            ; ;CMP #$66 ; what happens if it's not 66?
+            ; increment_long_addr CURRENT_POSITION
+            ; LDA  [CURRENT_POSITION] ; should be the type - I expect $C0
+            ; PHA
+            ; increment_long_addr CURRENT_POSITION
             
-            ; read the size of the data stream - and compute the end of stream position
-            setal
-            LDA [CURRENT_POSITION]
-            STA ADDER_A
-            increment_long_addr CURRENT_POSITION
-            increment_long_addr CURRENT_POSITION
-            setal
-            LDA [CURRENT_POSITION]
-            STA ADDER_A + 2
-            increment_long_addr CURRENT_POSITION
-            increment_long_addr CURRENT_POSITION
-            setal
-            LDA CURRENT_POSITION
-            STA ADDER_B
-            LDA CURRENT_POSITION + 2
-            STA ADDER_B + 2
+            ; ; read the size of the data stream - and compute the end of stream position
+            ; setal
+            ; LDA [CURRENT_POSITION]
+            ; STA ADDER_A
+            ; increment_long_addr CURRENT_POSITION
+            ; increment_long_addr CURRENT_POSITION
+            ; setal
+            ; LDA [CURRENT_POSITION]
+            ; STA ADDER_A + 2
+            ; increment_long_addr CURRENT_POSITION
+            ; increment_long_addr CURRENT_POSITION
+            ; setal
+            ; LDA CURRENT_POSITION
+            ; STA ADDER_B
+            ; LDA CURRENT_POSITION + 2
+            ; STA ADDER_B + 2
             
-            ; continue reading the file here
-            LDA ADDER_R
-            STA CURRENT_POSITION
-            LDA ADDER_R + 2
-            STA CURRENT_POSITION + 2
+            ; ; continue reading the file here
+            ; LDA ADDER_R
+            ; STA CURRENT_POSITION
+            ; LDA ADDER_R + 2
+            ; STA CURRENT_POSITION + 2
             
-            setas
-            PLA
-            BEQ UNCOMPRESSED
-            CMP #$C0
-            BNE UNKNOWN_DATA_BLOCK
+            ; setas
+            ; PLA
+            ; BEQ UNCOMPRESSED
+            ; CMP #$C0
+            ; BNE UNKNOWN_DATA_BLOCK
             
-    UNCOMPRESSED
-            setal
-            LDA DATA_STREAM_CNT ; multiply by 4
-            ASL A
-            ASL A
-            TAX
+    ; UNCOMPRESSED
+            ; setal
+            ; LDA DATA_STREAM_CNT ; multiply by 4
+            ; ASL A
+            ; ASL A
+            ; TAX
             
-            LDA ADDER_B
-            STA DATA_STREAM_TBL,X
-            LDA ADDER_B + 2
-            STA DATA_STREAM_TBL,X + 2
+            ; LDA ADDER_B
+            ; STA DATA_STREAM_TBL,X
+            ; LDA ADDER_B + 2
+            ; STA DATA_STREAM_TBL,X + 2
 
-            INC DATA_STREAM_CNT
-            setas
+            ; INC DATA_STREAM_CNT
+            ; setas
             
-    UNKNOWN_DATA_BLOCK
+    ; UNKNOWN_DATA_BLOCK
             RTS

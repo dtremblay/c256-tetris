@@ -20,7 +20,6 @@
 .include "tiny-vicky.asm"
 
 .include "io_def.asm"
-;TODO:.include "kernel_inc.asm"
 
 ;* = $000500
 ;TODO:.include "keyboard_def.asm"
@@ -105,7 +104,7 @@ JOYSTICK_POLL     = $83 ; 1 byte
 ; VGM Registers
 SONG_START        = $84 ; 4 bytes
 CURRENT_POSITION  = $88 ; 4 bytes
-WAIT_CNTR         = $8C ; 2 bytes
+VGM_TEMP          = $8C ; 2 bytes
 LOOP_OFFSET_REG   = $8E ; 2 bytes
 
 PSG_BASE_ADDRESS  = $D608 ; address to the combined Left/Right address
@@ -141,8 +140,6 @@ GAME_START
                 STZ VKY_BM1_CTRL      ; disable bitmap 1
                 STZ VKY_BM2_CTRL      ; disable bitmap 2
                 
-                ; TODO: disable sprites too
-                
                 ; write the RNG seed
                 LDA RTC_SECS
                 STA RND_SEEDL 
@@ -153,12 +150,13 @@ GAME_START
                 STA RND_CTRL
                 
                 JSR LOAD_GAME_ASSETS
+                ; read the hi-score list from disk
                 ; JSR ISDOS_INIT
                 ; JSR LOAD_HI_SCORES
                 LDA #GS_INTRO
                 STA GAME_STATE
                 
-                ;JSR VGM_INIT_TIMERS
+                JSR VGM_INIT_TIMERS
                 
                 ; set the display mode to tiles
                 LDA #VKY_Tile_Mode_En + VKY_Bitmap_Mode_En + VKY_Text_Mode_En + VKY_Graph_Mode_En + VKY_Text_Overlay
@@ -1224,16 +1222,22 @@ INIT_GAME
                 ; disable the intro tiles
                 STZ VKY_TILEMAP1_CTRL
                 
-                ; load the play music
-                ; LDA #`VGM_PLAY_MUSIC
-                ; STA CURRENT_POSITION + 2
-                ; STA SONG_START + 2
+                ; load the play music - switch slot 2 to point the the song start
+                LDA #ACT_EDIT + ACT_ED_L0
+                STA MMU_MEM_CTRL
                 
-                ; setal
-                ; LDA #<>VGM_PLAY_MUSIC
-                ; STA SONG_START
-                ; setas
-                ; JSR VGM_SET_SONG_POINTERS
+                LDA #(VGM_PLAY_MUSIC / $2000)
+                STA SONG_START + 2
+                STA 8+2
+                LDA #0
+                STA MMU_MEM_CTRL
+                
+                LDA #<VGM_PLAY_MUSIC
+                STA SONG_START
+                LDA #>VGM_PLAY_MUSIC
+                STA SONG_START + 1
+
+                JSR VGM_SET_SONG_POINTERS
                 
                 ; set the display mode to tiles
                 LDA #VKY_Tile_Mode_En + VKY_Bitmap_Mode_En + VKY_Text_Mode_En + VKY_Graph_Mode_En + VKY_Text_Overlay
@@ -1262,11 +1266,14 @@ INTRO_LOOP
                 
                 LDX #0
                 
+                ; switch slot 2 ($4000) to point to the VMG area
                 ; switch slot 5 ($A000) to point to the tiles area $1_0000 (slot 8)
-                LDA #$80
+                LDA #ACT_EDIT + ACT_ED_L0
                 STA MMU_MEM_CTRL
-                LDA #8
-                STA $D
+                LDA #(VGM_INTRO_MUSIC / $2000)
+                STA 8+2
+                LDA #($1_0000 / $2000)
+                STA 8+5
                 LDA #0
                 STA MMU_MEM_CTRL
                 
@@ -1315,15 +1322,23 @@ DISPLAY_INTRO
                 LDA #0
                 STA VKY_TILEMAP0_CTRL 
                 
-                ; load the intro music
-                ; LDA #`VGM_INTRO_MUSIC
-                ; STA CURRENT_POSITION + 2
-                ; STA SONG_START + 2
-                ; setal
-                ; LDA #<>VGM_INTRO_MUSIC
-                ; STA SONG_START
-                ; setas
-                ; JSR VGM_SET_SONG_POINTERS
+                ; set slot 2 to the start of the INTRO MUSIC
+                LDA #ACT_EDIT + ACT_ED_L0
+                STA MMU_MEM_CTRL
+                
+                LDA #(VGM_INTRO_MUSIC / $2000)
+                STA SONG_START + 2
+                STA 8+2
+                
+                LDA #0
+                STA MMU_MEM_CTRL
+                
+                ; load the intro music - slot 2 should be set to the hi-byte
+                LDA #<VGM_INTRO_MUSIC
+                STA SONG_START
+                LDA #>VGM_INTRO_MUSIC
+                STA SONG_START + 1
+                JSR VGM_SET_SONG_POINTERS
                 
                 display_text 29, 47, $70, INTRO_MSG
                 display_text 23, 49, $70, MACHINE_DESIGNER_MSG
@@ -1336,6 +1351,8 @@ DISPLAY_INTRO
                 LDA #VKY_TILEMAP_EN | VKY_TILEMAP_8
                 STA VKY_TILEMAP1_CTRL
                 RTS
+                
+.include "vgm_player.asm"
                 
 ; *****************************************************************************
 ; * variables
@@ -1457,11 +1474,9 @@ BACKGROUND
 
 ; these are the music assets
 VGM_INTRO_MUSIC
-;    .binary "music/06 Stage 2, 3 Boss, Stage 5 YMF262.vgm"
-;* = $17bf26
+    .binary "music/06 Stage 2, 3 Boss, Stage 5 YMF262.vgm"
 VGM_PLAY_MUSIC
-;    .binary "music/07 Stage 3 YM262.vgm"
-;* = $18b8b8
+    .binary "music/07 Stage 3 YM262.vgm"
 VGM_GAME_OVER_MUSIC
 ;    .binary "music/07 Player's Turn YM262.vgm"
 VGM_EFFECT_DROP

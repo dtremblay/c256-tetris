@@ -271,7 +271,7 @@ SOF_INTERRUPT
 ; ****************************************************************
 ; ****************************************************************
 TIMER0_INTERRUPT
-                ; JSR VGM_WRITE_REGISTER
+                JSR VGM_WRITE_REGISTER
                 RTS
                 
 TIMER1_INTERRUPT

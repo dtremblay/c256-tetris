@@ -3,6 +3,12 @@ MMU_MEM_CTRL   = $0000
     ACT_LUT1  = 1
     ACT_LUT2  = 2
     ACT_LUT3  = 3
+    
+    ACT_ED_L0 = $00
+    ACT_ED_L1 = $10
+    ACT_ED_L2 = $20
+    ACT_ED_L3 = $30
+    ACT_EDIT  = $80
 
 MMU_IO_CTRL    = $0001
     IO_PAGE0  = 0
