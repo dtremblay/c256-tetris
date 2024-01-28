@@ -31,6 +31,18 @@ TEXT_START    = $C000
 ; Color Display - in IO Page 3
 COLOR_START   = $C000
 
+PS2_CTRL      = $D640
+    K_WR      = 2
+    M_WR      = 4
+    KCLR      = $10
+    MCLR      = $20
+    
+PS2_OUT       = $D641
+KBD_IN        = $D642
+MOUSE_IN      = $D643
+PS2_STAT      = $D644
+    K_EMPTY   = 1
+    M_EMPTY   = 2
 ; MOUSE Registers
 MOUSE_REG     = $D6E0
     MOUSE_PTR_ENABLE = 1

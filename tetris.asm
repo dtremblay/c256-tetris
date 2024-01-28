@@ -8,7 +8,7 @@
 ; * This code is provided without warranty.
 ; * Please attribute credits to Daniel Tremblay if you reuse.
 ; *************************************************************************
-;.cpu "w65c02"
+.cpu "w65c02"
 .include "macros_inc.asm"
 .include "dma-macro.asm"
 .include "dma_inc.asm"
@@ -41,6 +41,8 @@ ROW_PER_PAGE       = 60
 INITIAL_GAME_SPEED = 40
 BOARD_WIDTH        = 10
 BOARD_HEIGHT       = 20
+WALL               = 1
+MIDDLE_POSITION    = 3
 
 ; ****************************************************
 ; *                RESERVED REGISTER AREA
@@ -102,15 +104,14 @@ INTRO_SLIDE_CNT   = $82 ; 1 byte
 JOYSTICK_POLL     = $83 ; 1 byte
 
 ; VGM Registers
-SONG_START        = $84 ; 4 bytes
-CURRENT_POSITION  = $88 ; 4 bytes
+SONG_START        = $84 ; 3 bytes
+CURRENT_POSITION  = $87 ; 2 bytes - the slot 2 byte is used
+LOOP_OFFSET_REG   = $89 ; 3 bytes
 VGM_TEMP          = $8C ; 2 bytes
-LOOP_OFFSET_REG   = $8E ; 2 bytes
+KEYPRESSED        = $8E ; 1 byte
 
 PSG_BASE_ADDRESS  = $D608 ; address to the combined Left/Right address
 OPL3_BASE_ADRESS  = $D580
-
-
 
 ; TEMPORARY MEMORY LOCATION
 TEMP_LOCATION     = $90 ; 2 bytes
@@ -143,7 +144,7 @@ GAME_START
                 ; write the RNG seed
                 LDA RTC_SECS
                 STA RND_SEEDL 
-                LDA #5
+                LDA #MIDDLE_POSITION  ;  each piece is a 4x4 array
                 STA PIECE_X
                 STZ RND_SEEDH
                 LDA #RND_ENABLE + RND_SEED_LOAD
@@ -166,26 +167,40 @@ GAME_START
                 LDA #RND_ENABLE
                 STA RND_CTRL
                 
-    NEXT_GAME
                 JSR CLR_SCREEN ; clears the text
                 
-                ; Enable SOF and TIMER0 and PS2 Keyboard
-                LDA #~( INT0_VKY_SOF | INT0_TIMER_0 | INT0_TIMER_1 | INT0_PS2_KBD)
+    NEXT_GAME
+                
+                ; Enable SOF and TIMER0 and PS2 Keyboard 
+                LDA #~(INT0_VKY_SOF | INT0_TIMER_0 | INT0_PS2_KBD )
                 STA INT_MASK_REG0
                 ; Enable Joystick and F256K Keyboard
-                LDA #~( INT1_VIA0 | INT1_VIA1 )
+                LDA #~( INT1_VIA0 | INT1_VIA0 | INT1_VIA1 )
                 STA INT_MASK_REG1
                 
                 LDA GAME_STATE
                 CMP #GS_INTRO
                 BNE SKIP_INTRO
                 
-                JSR DISPLAY_INTRO
+                ; clear PS2 keyboard FIFO
+                LDA #KCLR
+                STA PS2_CTRL
+                STZ PS2_CTRL
+                
+                ; check the buffer is empty - only do this 10 times
+                LDX #10
+        -       LDA PS2_STAT
+                DEX
+                BEQ +
+                AND #1
+                BNE -
+                
+        +       JSR DISPLAY_INTRO
+        
                 CLI
                 BRA INFINITE_LOOP
                 
         SKIP_INTRO
-                SEI
             RANDOM_TRY_AGAIN
                 LDA RND_L
                 AND #7
@@ -194,19 +209,17 @@ GAME_START
                 BEQ RANDOM_TRY_AGAIN
                 
                 JSR PICK_NEXT_PIECE
-                
                 JSR DRAW_NEXT_PIECE
-                CLI
                 
-                ; wait for interrupts
     INFINITE_LOOP
+                ; wait for interrupts
                 NOP
                 NOP
                 NOP
                 LDA GAME_STATE
                 CMP #GS_RESTARTING
                 BNE IL_DONE
-                
+
                 LDA #GS_RUNNING
                 STA GAME_STATE
                 JSR INIT_GAME
@@ -323,7 +336,7 @@ DISPLAY_BOARD_LOOP
                 JSR LOOK_FOR_LINES
                 
                 ; choose another piece and set it at the top
-                LDA #5
+                LDA #MIDDLE_POSITION
                 STA PIECE_X
                 LDA #0
                 STA PIECE_Y
@@ -631,7 +644,7 @@ COPY_PIECE
                 
                 TYA
                 CLC
-                ADC #BOARD_WIDTH
+                ADC #BOARD_WIDTH-4
                 TAY
                 
                 TXA
@@ -688,7 +701,7 @@ DOES_PIECE_FIT
                 
                 TYA
                 CLC
-                ADC #BOARD_WIDTH
+                ADC #BOARD_WIDTH-4
                 TAY
                 
                 TXA
@@ -712,15 +725,17 @@ DRAW_BOARD
                 LDA #>START_TILEMAP
                 STA CURSORPOS + 1
                 
+                LDX #0 ; the offset in the BOARD
+                
                 STZ CURCOLOR  ; use this pointer to count the number of rows
-     DB_INNER   LDX #0
+     DB_INNER   STZ TEMP_LOCATION ; use this to store the column
                 LDY #0
                 
-                LDA #1
+                LDA #WALL
                 STA (CURSORPOS),Y ; the tile
                 INY
                 INY
-                LDA #1
+                LDA #WALL
                 STA (CURSORPOS),Y ; the tile
                 INY
                 INY
@@ -728,16 +743,18 @@ DRAW_BOARD
           -     LDA BOARD,X
                 STA (CURSORPOS),Y ; the tile
                 INX
+                INC TEMP_LOCATION
                 INY
                 INY
-                CPX #BOARD_WIDTH
+                LDA TEMP_LOCATION
+                CMP #BOARD_WIDTH
                 BNE - 
                 
-                LDA #1
+                LDA #WALL
                 STA (CURSORPOS),Y ; the tile
                 INY
                 INY
-                LDA #1
+                LDA #WALL
                 STA (CURSORPOS),Y ; the tile
                 INY
                 INY
@@ -751,13 +768,13 @@ DRAW_BOARD
                 BCC +
                 INC CURSORPOS + 1
                 
-         +      LDX CURCOLOR
-                CPX #BOARD_HEIGHT
+         +      LDA CURCOLOR
+                CMP #BOARD_HEIGHT + 1
                 BNE DB_INNER
                 
                 ; now draw the two bottom row(s)
                 LDY #0
-         -      LDA #1
+         -      LDA #WALL
                 STA (CURSORPOS),Y
                 INY
                 INY
@@ -789,9 +806,9 @@ DRAW_PIECE
                 STA ADDER_A
                 LDA MULU_RES+1
                 STA ADDER_A + 1
-                LDA #<START_TILEMAP
+                LDA #<START_TILEMAP+4
                 STA ADDER_B
-                LDA #>START_TILEMAP
+                LDA #>START_TILEMAP+4
                 STA ADDER_B+1
                 
                 LDA ADDER_RES
@@ -1045,8 +1062,89 @@ DISPLAY_MSG
 ; * Game Over screen
 ; *****************************************************************************
 GAME_OVER
+                ; check if the score is one of the 10 highest
+                ;JSR CHECK_SCORE
+                
+                LDA HISCORE_LINE
+                CMP #10
+                BEQ NOT_A_HISCORE
+                
+                ; show the user name entry screen
+                LDA #GS_NAME_ENTRY
+                BRA G_O_RESUME
+                
+        NOT_A_HISCORE
+                LDA #GS_GAME_OVER
+        G_O_RESUME
+                STA GAME_STATE
+                LDA #0
+                STA GAME_OVER_TICK
+                LDA #$30
+                STA GAME_OVER_TIMER
+                
+                LDA #$0 ; disable the tiles
+                STA VKY_TILEMAP0_CTRL
+                STA VKY_TILEMAP1_CTRL
+                
+                ; load the game over music
+                LDA #bank(VGM_GAME_OVER_MUSIC)
+                STA CURRENT_POSITION + 2
+                STA SONG_START + 2
+                LDA #<VGM_GAME_OVER_MUSIC
+                STA SONG_START
+                LDA #>VGM_GAME_OVER_MUSIC
+                STA SONG_START + 1
+                JSR VGM_SET_SONG_POINTERS
+                
+                JSR CLR_SCREEN
+                
+                ; display GAME OVER
+                display_text 31, 26, $23, GAME_OVER_MSG
+                ; display SCORE text
+                display_text 29, 27, $20, SCORE_MSG
+                
+                ; display the numerical score
+                INC CURSORPOS
+                LDA SCORE + 2
+                JSR DISPLAY_HEX
+                LDA SCORE + 1
+                JSR DISPLAY_HEX
+                LDA SCORE
+                JSR DISPLAY_HEX
+                
+                LDA GAME_STATE
+                CMP #GS_NAME_ENTRY
+                BNE G_O_SKIP_ENTRY_MSG
+                
+                ; display Press Return when done message
+                display_text 24, 36, $20, RETURN_DONE_MSG
+                
+                ; display Backspace message
+                display_text 24, 37, $20, BKSP_MSG
+                
+                ; display USER_NAME_ENTRY PROMPT
+                display_text 24, 32, $23, ENTER_USERNAME_MSG
+                
+        G_O_SKIP_ENTRY_MSG
+                JSR DISPLAY_COUNTDOWN
+                
+                ; clear the board
+                dma_fill 0, BOARD, BOARD_WIDTH*BOARD_HEIGHT
+                
+                LDA #0
+                STA PIECE_Y
+                
 				RTS
                 
+DISPLAY_COUNTDOWN
+                ; display RESTART
+                display_text 29, 29, $20, RESTART_MSG
+                
+                ; the countdown timer is in BCD
+                LDA GAME_OVER_TIMER
+                JSR DISPLAY_HEX
+                
+                RTS
 ; *************************************************************************1386
 ; * Display Hex value at CURSORPOS, with color CURCOLOR
 ; * Value to display is in A
@@ -1066,9 +1164,14 @@ DISPLAY_HEX
                 LSR A
                 LSR A
                 CLC
-                ADC #'0'
+                CMP #$A
+                BGE +
                 
-                LDX #IO_PAGE2
+                ADC #'0'
+                BRA DH_1ST_CHAR
+           +    ADC #'6'
+                
+   DH_1ST_CHAR  LDX #IO_PAGE2
                 STX MMU_IO_CTRL
                 STA (CURSORPOS)
                 
@@ -1083,9 +1186,15 @@ DISPLAY_HEX
                 PLA
                 AND #$F
                 CLC
-                ADC #'0'
+                CMP #$A
+                BGE + 
                 
-                LDX #IO_PAGE2
+                ADC #'0'
+                BRA DH_2ND_CHAR
+                
+          +     ADC #'6' 
+                
+   DH_2ND_CHAR  LDX #IO_PAGE2
                 STX MMU_IO_CTRL
                 STA (CURSORPOS)
                 INC CURSORPOS
@@ -1126,7 +1235,7 @@ LOAD_GAME_ASSETS
                 STA VKY_TILESET0_ADDR
                 LDA #>TILESET
                 STA VKY_TILESET0_ADDR + 1
-                LDA #`TILESET
+                LDA #bank(TILESET)
                 STA VKY_TILESET0_ADDR + 2
                 ; enable tileset with 128 stride
                 LDA #VKY_TILESET_SQ
@@ -1136,7 +1245,7 @@ LOAD_GAME_ASSETS
                 STA VKY_BM1_ADDR_L
                 LDA #>BACKGROUND
                 STA VKY_BM1_ADDR_L + 1
-                LDA #`BACKGROUND
+                LDA #bank(BACKGROUND)
                 STA VKY_BM1_ADDR_L + 2
                 ; enable bitmap 1 with LUT1
                 LDA #VKY_BITMAP_EN + VKY_BITMAP_LUT1
@@ -1169,7 +1278,7 @@ LOAD_GAME_ASSETS
                 STA VKY_TILEMAP0_AD
                 LDA #>TILEMAP
                 STA VKY_TILEMAP0_AD + 1
-                LDA #`TILEMAP
+                LDA #bank(TILEMAP)
                 STA VKY_TILEMAP0_AD + 2
                 
                 ; set the tilemap 1 address
@@ -1177,7 +1286,7 @@ LOAD_GAME_ASSETS
                 STA VKY_TILEMAP1_AD
                 LDA #>INTRO_TILEMAP
                 STA VKY_TILEMAP1_AD + 1
-                LDA #`INTRO_TILEMAP
+                LDA #bank(INTRO_TILEMAP)
                 STA VKY_TILEMAP1_AD + 2
                 
                 ; assign bitmap1 to LAYER2
@@ -1214,13 +1323,14 @@ INIT_GAME
                 STA LEVEL
                 
                 ; clear board and tilemap
-                dma_fill 0, BOARD, BOARD_WIDTH*BOARD_HEIGHT + 40*30*2
+                dma_fill 0, BOARD, BOARD_WIDTH*BOARD_HEIGHT
+                dma_fill 0, TILEMAP, 40*30*2
                 
+                ; disable the intro tiles
+                STZ VKY_TILEMAP1_CTRL
                 ; enable the board tiles
                 LDA #VKY_TILEMAP_EN | VKY_TILEMAP_8
                 STA VKY_TILEMAP0_CTRL
-                ; disable the intro tiles
-                STZ VKY_TILEMAP1_CTRL
                 
                 ; load the play music - switch slot 2 to point the the song start
                 LDA #ACT_EDIT + ACT_ED_L0
@@ -1232,11 +1342,11 @@ INIT_GAME
                 LDA #0
                 STA MMU_MEM_CTRL
                 
-                LDA #<VGM_PLAY_MUSIC
+                ; load the game music - slot 2 should be set to the hi-byte
+                LDA #<(2 * $2000 + (VGM_PLAY_MUSIC % $2000))
                 STA SONG_START
-                LDA #>VGM_PLAY_MUSIC
+                LDA #>(2 * $2000 + (VGM_PLAY_MUSIC % $2000))
                 STA SONG_START + 1
-
                 JSR VGM_SET_SONG_POINTERS
                 
                 ; set the display mode to tiles
@@ -1265,17 +1375,6 @@ INTRO_LOOP
                 STA INTRO_SLIDE_CNT
                 
                 LDX #0
-                
-                ; switch slot 2 ($4000) to point to the VMG area
-                ; switch slot 5 ($A000) to point to the tiles area $1_0000 (slot 8)
-                LDA #ACT_EDIT + ACT_ED_L0
-                STA MMU_MEM_CTRL
-                LDA #(VGM_INTRO_MUSIC / $2000)
-                STA 8+2
-                LDA #($1_0000 / $2000)
-                STA 8+5
-                LDA #0
-                STA MMU_MEM_CTRL
                 
                 ; prepare to copy bytes from mem to video ram
                 LDA #<SLOT5 + (INTRO_TILEMAP - TILESET)
@@ -1319,24 +1418,24 @@ INTRO_LOOP
 ; *****************************************************************************          
 DISPLAY_INTRO
                 ; disable layer 0
-                LDA #0
-                STA VKY_TILEMAP0_CTRL 
+                STZ VKY_TILEMAP0_CTRL 
                 
-                ; set slot 2 to the start of the INTRO MUSIC
+                ; switch slot 2 ($4000) to point to the VMG area INTRO MUSIC
+                ; switch slot 5 ($A000) to point to the tiles area $1_0000 (slot 8)
                 LDA #ACT_EDIT + ACT_ED_L0
                 STA MMU_MEM_CTRL
-                
                 LDA #(VGM_INTRO_MUSIC / $2000)
-                STA SONG_START + 2
                 STA 8+2
-                
+                STA SONG_START + 2
+                LDA #($1_0000 / $2000)
+                STA 8+5
                 LDA #0
                 STA MMU_MEM_CTRL
                 
                 ; load the intro music - slot 2 should be set to the hi-byte
-                LDA #<VGM_INTRO_MUSIC
+                LDA #<(2 * $2000 + (VGM_INTRO_MUSIC % $2000))
                 STA SONG_START
-                LDA #>VGM_INTRO_MUSIC
+                LDA #>(2 * $2000 + (VGM_INTRO_MUSIC % $2000))
                 STA SONG_START + 1
                 JSR VGM_SET_SONG_POINTERS
                 
@@ -1419,6 +1518,7 @@ PIECE6
 
 BOARD
     .fill BOARD_HEIGHT*BOARD_WIDTH, 0
+    .fill BOARD_WIDTH,6
 
 TILEMAP
     .fill 40*30*2, 0  ; the board is 40 x 30 - each tile is 2 bytes
@@ -1478,9 +1578,9 @@ VGM_INTRO_MUSIC
 VGM_PLAY_MUSIC
     .binary "music/07 Stage 3 YM262.vgm"
 VGM_GAME_OVER_MUSIC
-;    .binary "music/07 Player's Turn YM262.vgm"
+    .binary "music/07 Player's Turn YM262.vgm"
 VGM_EFFECT_DROP
 VGM_EFFECT_ROTATE
-;.binary "tile-down.vgm"
+    .binary "tile-down.vgm"
 VGM_EFFECT_LINE
-;.binary "bar.vgm"
+    .binary "bar.vgm"

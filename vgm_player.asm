@@ -54,6 +54,8 @@ AY_3_8910_N       = $96 ; 2 bytes
 ; third parameter is the max hi byte
 ; fourth paramter is the min hi byte
 increment_long_addr   .macro
+            ; instead of PHA/PLA, use TAY and TYA
+            TAY
             CLC
             LDA \1
             ADC #\2
@@ -63,23 +65,22 @@ increment_long_addr   .macro
             LDA \1 + 1
             ADC #0
             STA \1 + 1
-            CMP \3 ; if we get to the upper bound, switch the slot
+            CMP #\3 ; if we get to the upper bound, switch the slot
             BLT skip_n_done
             
             
             LDA #\4
             STA \1 + 1
             ; switch the slot to the next area in memory
-            LDA #80
+            LDA #ACT_EDIT + ACT_ED_L0
             STA MMU_MEM_CTRL
             
-            LDA CURRENT_POSITION + 2
-            INC A
-            STA 8+2  ; slot 2
+            INC 8+2  ; slot 2
             LDA #0
             STA MMU_MEM_CTRL
 
     skip_n_done
+            TYA
             .endm
 
 ; *******************************************************************
@@ -126,16 +127,25 @@ INVALID_COMMAND
             JMP VGM_WRITE_REGISTER
             
 restart_timer0      .macro
-            LDA #0    ; set timer0 charge to 0
-            STA TIMER0_CHARGE
-            STA TIMER0_CHARGE + 1
-            STA TIMER0_CHARGE + 2
+            LDA #TMR_CMP_RESET  ; reset to 0 when COMPARE value reached
+            STA TIMER0_CMP_CTR
             
-            LDA #TMR_CMP_RECLR  ; count up from "CHARGE" value to TIMER_CMP
-            STA TIMER0_CMP_REG
+            lda #TMR_CLR          ; Clear timer 0
+            sta TIMER0_CTRL_REG
             
-            LDA #(TMR_EN | TMR_UPDWN | TMR_SCLR )
+            LDA #(TMR_EN | TMR_UPDWN | TMR_INT_EN )
             STA TIMER0_CTRL_REG
+                    .endm
+            
+restart_timer1      .macro
+            LDA #TMR_CMP_RESET  ; reset to 0 when COMPARE value reached
+            STA TIMER1_CMP_CTR
+            
+            lda #TMR_CLR          ; Clear timer 0
+            sta TIMER1_CTRL_REG
+            
+            LDA #(TMR_EN | TMR_UPDWN )
+            STA TIMER1_CTRL_REG
                     .endm
             
 SKIP_BYTE_CMD
@@ -556,7 +566,7 @@ WRITE_YM_CMD
             
             ; the third byte is the value to write in the register
             LDA (CURRENT_POSITION)
-            STA OPL3_BASE_ADRESS+1
+            STA OPL3_BASE_ADRESS + 1
             increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             JMP VGM_WRITE_REGISTER
             
@@ -566,12 +576,12 @@ WRITE_YM_CMD
             
             ; the second byte is the register
             LDA (CURRENT_POSITION)
-            STA OPL3_BASE_ADRESS
+            STA OPL3_BASE_ADRESS + 2
             increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             
             ; the third byte is the value to write in the register
             LDA (CURRENT_POSITION)
-            STA OPL3_BASE_ADRESS+2
+            STA OPL3_BASE_ADRESS + 1
             increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
     YM_DONE
             JMP VGM_WRITE_REGISTER
@@ -592,9 +602,9 @@ WAIT_COMMANDS
             LDA (CURRENT_POSITION)
             STA MULU_A + 1
             increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
-            LDA #$<145
+            LDA #<(6290000/11000)
             STA MULU_B
-            LDA #$>145
+            LDA #>(6290000/11000)
             STA MULU_B + 1
             
             LDA MULU_RES
@@ -639,7 +649,19 @@ WAIT_COMMANDS
             CMP #$66 ; end of song
             BNE CHK_DATA_BLOCK
             
-            JSR VGM_SET_LOOP_POINTERS
+            LDA LOOP_OFFSET_REG
+            STA CURRENT_POSITION
+            LDA LOOP_OFFSET_REG + 1
+            STA CURRENT_POSITION + 1
+            
+            ; change the slot 2 reference
+            LDA #ACT_EDIT + ACT_ED_L0
+            STA MMU_MEM_CTRL
+            LDA LOOP_OFFSET_REG + 2
+            STA 8+2
+            LDA #0
+            STA MMU_MEM_CTRL
+          
             JMP VGM_LOOP_DONE
             
         CHK_DATA_BLOCK
@@ -722,11 +744,6 @@ DAC_STREAM
 ; * Copy the song offset pointer to CURRENT_POSITION
 ; *******************************************************************
 VGM_SET_SONG_POINTERS           
-            ; add the start offset
-            LDA SONG_START + 2         ; for the F256K, this is the slot #
-            STA CURRENT_POSITION + 2
-            
-   NO_LOOP_INFO
             ; compute song_start + vgm_offset + song_offset
             LDY #VGM_OFFSET
             LDA (SONG_START),Y
@@ -744,19 +761,13 @@ VGM_SET_SONG_POINTERS
        +    LDA SONG_START
             STA ADDER_B
             LDA SONG_START + 1
-            STZ ADDER_B + 1
+            STA ADDER_B + 1
             
             LDA ADDER_RES
             STA CURRENT_POSITION
             LDA ADDER_RES + 1
             STA CURRENT_POSITION +1
             
-            RTS
-
-; *******************************************************************
-; * Set CURRENT_POSITION to LOOP_OFFSET
-; *******************************************************************
-VGM_SET_LOOP_POINTERS
             ; check if loop offset is zero
             LDY #LOOP_OFFSET
             LDA (SONG_START),Y
@@ -765,7 +776,14 @@ VGM_SET_LOOP_POINTERS
             INY
             LDA (SONG_START),Y
             BNE +
-            JMP NO_LOOP_INFO ; if this is zero, assume that the upper word is also 0
+            
+            ; if offset is zero, set the LOOP_OFFSET_REG to CURRENT_POSITION
+            LDA CURRENT_POSITION
+            STA LOOP_OFFSET_REG
+            LDA CURRENT_POSITION + 1
+            STA LOOP_OFFSET_REG + 1
+            LDA SONG_START + 2
+            STA LOOP_OFFSET_REG + 2
             
        +    ; add the loop offset
             LDY #LOOP_OFFSET
@@ -786,9 +804,12 @@ VGM_SET_LOOP_POINTERS
             LDA SONG_START + 1
             STA ADDER_B + 1
             LDA ADDER_RES
-            STA CURRENT_POSITION
+            STA LOOP_OFFSET_REG
             LDA ADDER_RES + 1
-            STA CURRENT_POSITION + 1
+            STA LOOP_OFFSET_REG + 1
+            ;TODO: this is not certain -check
+            LDA SONG_START + 2
+            STA LOOP_OFFSET_REG + 2
             
             RTS
 
@@ -796,31 +817,18 @@ VGM_SET_LOOP_POINTERS
 ; * timer0 is for the music
 ; * timer1 is for the effects
 VGM_INIT_TIMERS
-            LDA #64
+            LDA #5
             STA TIMER0_CMP
             STA TIMER1_CMP
-            LDA #1
+            LDA #5
             STA TIMER0_CMP+1
             STA TIMER1_CMP+1
-            LDA #0
+            LDA #5
             STA TIMER0_CMP+2
             STA TIMER1_CMP+2
             
-            LDA #0    ; set timer0 and timer1 charge to 0
-            STA TIMER0_CHARGE
-            STA TIMER0_CHARGE+1
-            STA TIMER0_CHARGE+2
-            STA TIMER1_CHARGE
-            STA TIMER1_CHARGE+1
-            STA TIMER1_CHARGE+2
-            
-            LDA #TMR_CMP_RECLR  ; count up from "CHARGE" value to TIMER_CMP
-            STA TIMER0_CMP_REG
-            STA TIMER1_CMP_REG
-            
-            LDA #(TMR_EN | TMR_UPDWN | TMR_SCLR)
-            STA TIMER0_CTRL_REG
-            STA TIMER1_CTRL_REG
+            restart_timer0
+            restart_timer1
 
             RTS
             

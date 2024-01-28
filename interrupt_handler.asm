@@ -28,7 +28,7 @@ IRQ_HANDLER
 ; Start of Frame (display), timer 0 (music), mouse (ignored)
                 check_irq_bit INT_PENDING_REG0, INT0_VKY_SOF, SOF_INTERRUPT
                 check_irq_bit INT_PENDING_REG0, INT0_TIMER_0, TIMER0_INTERRUPT
-                check_irq_bit INT_PENDING_REG0, INT0_TIMER_1, TIMER1_INTERRUPT
+                ;check_irq_bit INT_PENDING_REG0, INT0_TIMER_1, TIMER1_INTERRUPT
                 check_irq_bit INT_PENDING_REG0, INT0_PS2_KBD, KEYBOARD_INTERRUPT_PS2  ; for PS/2 keyboard
 
 ; Second Block of 8 Interrupts
@@ -36,11 +36,13 @@ CHECK_PENDING_REG1
                 LDA INT_PENDING_REG1
                 BEQ CHECK_PENDING_REG2   ; BEQ EXIT_IRQ_HANDLE
 ; Keyboard Interrupt
+                check_irq_bit INT_PENDING_REG1, INT1_VIA0, JOYSTICK_INTERRUPT
                 check_irq_bit INT_PENDING_REG1, INT1_VIA1, KEYBOARD_INTERRUPT_MATRIX
 
 ; Third Block of 8 Interrupts
 CHECK_PENDING_REG2
                 LDA INT_PENDING_REG2
+                STA INT_PENDING_REG2
                 BEQ EXIT_IRQ_HANDLE
                 
 EXIT_IRQ_HANDLE
@@ -48,22 +50,45 @@ EXIT_IRQ_HANDLE
                 PLX
                 PLA
                 RTI
+                
+; ****************************************************************
+;
+;  Joystick
+;
+; ****************************************************************
+JOYSTICK_INTERRUPT
+                ;RTS
+; ****************************************************************
+;
+;  MATRIX Keyboard
+;
+; ****************************************************************
+KEYBOARD_INTERRUPT_MATRIX
+                ;RTS
 
-; ****************************************************************
-; ****************************************************************
-;
-;  KEYBOARD_INTERRUPT_PS2
-;
-; ****************************************************************
 ; ****************************************************************
 ; * The only keys accepted are Left Arrow, Right Arrow, Down Arrow and Space (to rotate)
 ; * Alias ASD keys to arrows?
+; ****************************************************************
 KEYBOARD_INTERRUPT_PS2
 
     ; MORE_KEYS
                 ; LOAD_KBD_INPT_BUF        ; Get Scan Code from KeyBoard
-                ; CMP #$7F
-                ; BGE DONT_REACT
+                LDA KBD_IN
+                STA KEYPRESSED
+                
+                ; for debugging - display the key
+                LDA #<(TEXT_START + 60)
+                STA CURSORPOS
+                LDA #>(TEXT_START + 60)
+                STA CURSORPOS + 1
+                LDA #$50
+                STA CURCOLOR
+                LDA KEYPRESSED
+                JSR DISPLAY_HEX
+                
+                CMP #$7F
+                BGE DONT_REACT
                 ; TAX
                 LDA GAME_STATE
                 CMP #GS_INTRO
@@ -72,6 +97,9 @@ KEYBOARD_INTERRUPT_PS2
                 ; the user has pressed a key change the game state to play
                 LDA #GS_RESTARTING
                 STA GAME_STATE
+                ; this routine calls the DMA - must be done here?
+                JSR CLR_SCREEN
+                
                 BRA DONT_REACT
                
     NOT_INTRO
@@ -165,8 +193,7 @@ KEYBOARD_INTERRUPT_PS2
                 ; .word <>MOVE_PIECE_DOWN
                 ; .word <>ROTATE_PIECE
                 
-KEYBOARD_INTERRUPT_MATRIX
-                RTS
+
 
 ; ****************************************************************
 ; ****************************************************************
@@ -188,10 +215,19 @@ SOF_INTERRUPT
                 ; JSR HANDLE_JOYSTICK
                 
                 LDA GAME_STATE  ; The SOF is still getting called, even when masked
-                BNE CHK_GAME_OVER
+                BNE CHK_GAME_RESTARTING
                 
                 JSR DISPLAY_BOARD_LOOP
                 BRA SOF_DONE
+                
+    CHK_GAME_RESTARTING
+                CMP #GS_RESTARTING
+                BNE CHK_GAME_OVER
+
+                
+                
+                BRA SOF_DONE
+                
                 
     CHK_GAME_OVER
                 CMP #GS_GAME_OVER

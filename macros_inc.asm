@@ -68,3 +68,6 @@ copy_io_data    .macro
            +    BRA cp_io_lp
     cp_io_end  
                 .endm
+                
+; a function to return the correct bank even with 6502 processors
+bank            .sfunction _label, `_label.__offset__
