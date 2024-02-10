@@ -36,7 +36,7 @@ CHECK_PENDING_REG1
                 LDA INT_PENDING_REG1
                 BEQ CHECK_PENDING_REG2   ; BEQ EXIT_IRQ_HANDLE
 ; Keyboard Interrupt
-                check_irq_bit INT_PENDING_REG1, INT1_VIA0, JOYSTICK_INTERRUPT
+                ;check_irq_bit INT_PENDING_REG1, INT1_VIA0, JOYSTICK_INTERRUPT
                 check_irq_bit INT_PENDING_REG1, INT1_VIA1, KEYBOARD_INTERRUPT_MATRIX
 
 ; Third Block of 8 Interrupts
@@ -50,32 +50,68 @@ EXIT_IRQ_HANDLE
                 PLX
                 PLA
                 RTI
-                
-; ****************************************************************
-;
-;  Joystick
-;
-; ****************************************************************
-JOYSTICK_INTERRUPT
-                ;RTS
+
 ; ****************************************************************
 ;
 ;  MATRIX Keyboard
 ;
 ; ****************************************************************
 KEYBOARD_INTERRUPT_MATRIX
-                ;RTS
+                LDA #$FF
+                STA VIA1_DDRB 
+                
+                LDA #~%0000_0100
+                STA VIA1_IORB
+                LDA VIA1_IORA
+                BIT #2  ; check if the A key is pressed
+                BNE +
+                
+                LDA #LEFT_KEY
+                STA KEYPRESSED
+                BRA KIM_END
+                
+         +      LDA VIA1_IORA
+                BIT #4   ; check if the D key is pressed
+                BNE +
+                
+                LDA #RIGHT_KEY
+                STA KEYPRESSED
+                BRA KIM_END
+                
+         +      LDA #~%0001_0000
+                STA VIA1_IORB ; check if the SPACE key is pressed
+                LDA VIA1_IORA
+                BIT #$80
+                BNE KIM_END
+                
+                LDA #SPACE_KEY
+                STA KEYPRESSED
+                
+                LDA GAME_STATE
+                CMP #GS_INTRO
+                BNE KIM_END
+                
+                ; the user has pressed a key change the game state to play
+                LDA #GS_RESTARTING
+                STA GAME_STATE
+                ; this routine calls the DMA - must be done here?
+                JSR CLR_SCREEN
+                
+    KIM_END     
+                RTS
 
 ; ****************************************************************
 ; * The only keys accepted are Left Arrow, Right Arrow, Down Arrow and Space (to rotate)
 ; * Alias ASD keys to arrows?
 ; ****************************************************************
 KEYBOARD_INTERRUPT_PS2
-
-    ; MORE_KEYS
                 ; LOAD_KBD_INPT_BUF        ; Get Scan Code from KeyBoard
-                LDA KBD_IN
+                LDA PS2_KBD_IN
                 STA KEYPRESSED
+                BEQ DONT_REACT        ; if 0 then don't do anything
+                
+                CMP #$7F              ; ignore any keys above $7F
+                BGE DONT_REACT
                 
                 ; for debugging - display the key
                 LDA #<(TEXT_START + 60)
@@ -89,12 +125,16 @@ KEYBOARD_INTERRUPT_PS2
                 
                 CMP #$7F
                 BGE DONT_REACT
-                ; TAX
+                
                 LDA GAME_STATE
                 CMP #GS_INTRO
                 BNE NOT_INTRO
                 
-                ; the user has pressed a key change the game state to play
+                LDA KEYPRESSED
+                CMP #$29
+                BNE DONT_REACT
+                
+                ; the user has pressed the SPACE key: change the game state to play
                 LDA #GS_RESTARTING
                 STA GAME_STATE
                 ; this routine calls the DMA - must be done here?
@@ -107,91 +147,127 @@ KEYBOARD_INTERRUPT_PS2
                 CMP #GS_NAME_ENTRY
                 BEQ NAME_ENTRY
                 
-                ; LDA ScanCode_Press_Set1,X
-                ; TAX
-                ; CPX #0
-                ; BEQ DONT_REACT
-                ; LDA GAME_STATE
-                ; CMP #GS_LINE_BONUS
-                ; BEQ DONT_REACT
-                ; JSR (KEY_JUMP_TABLE,X)
-                ; RTS
+                LDA KEYPRESSED
+                CMP #$1C  ; LEFT KEY
+                BNE +
+                
+                JSR MOVE_PIECE_LEFT
+                BRA DONT_REACT
+                
+         +      CMP #$29  ; SPACE
+                BNE +
+                
+                JSR ROTATE_PIECE
+                BRA DONT_REACT
+                
+         +      CMP #$23  ; RIGHT KEY
+                BNE +
+                
+                JSR MOVE_PIECE_RIGHT
+                BRA DONT_REACT
+                
+         +      CMP #$1B  ; DOWN KEY
+                BNE DONT_REACT
+                
+                JSR MOVE_PIECE_DOWN      
+                
+     DONT_REACT   
+                ; read until buffer is empty
+         -      LDA PS2_STAT
+                BIT #1
+                BNE +
+                
+                LDA PS2_KBD_IN
+                BRA -
+         +      RTS
                 
     NAME_ENTRY
-                ; .xs
-                ; CPX #$E
-                ; BEQ BACKSPACE_KEY
+                ; backspace and enter key have special actions
+                ; other keys will lookup in array - if zero then nothing happens
+                LDA KEYPRESSED
+                CMP #BACKSPACE_KEY
+                BEQ NE_BACKSPACE_KEY
                 
-                ; CPX #$1C
-                ; BEQ ENTER_KEY
+                CMP #ENTER_KEY
+                BEQ NE_ENTER_KEY
                 
-                ; LDA ScanCode_Press_Set2,X
-                ; CMP #0
-                ; BEQ DONT_REACT
+                TAX
+                LDA KEYBOARD_TO_CHAR,X
+                BEQ DONT_REACT
                 
-                ; JSR ADD_CHAR
-                ; BRA DONT_REACT
+                JSR ADD_CHAR
+                BRA DONT_REACT
                 
-    ; BACKSPACE_KEY
-                ; JSR DEL_CHAR
-                ; BRA DONT_REACT
+    NE_BACKSPACE_KEY
+                ; check that we're not going backwards
+                JSR DEL_CHAR
+                BRA DONT_REACT
                 
-    ; ENTER_KEY
-                ; ; replace all _ with space
-                ; LDA HISCORE_OFFSET
-                ; CMP #6
-                ; BEQ E_K_DONE
-                ; CLC
-                ; ADC TEMP_LOCATION
+    NE_ENTER_KEY
+                ; hide the cursor
+                STZ VKY_CURSOR_CTRL
                 
-                ; TAX
-                ; LDA #$20
+                ; replace all _ with space
+                LDA HISCORE_OFFSET
+                CMP #6
+                BEQ E_K_DONE
                 
-                ; STA HI_SCORES,X
-                ; INC HISCORE_OFFSET
-                ; BRA ENTER_KEY
+                CLC
+                ADC TEMP_LOCATION
                 
-        ; E_K_DONE
-                ; setxl
-                ; JSR SAVE_HI_SCORES
+                TAX
+                LDA #$20
+                STA HI_SCORES,X
+                INC HISCORE_OFFSET
+                BRA NE_ENTER_KEY
                 
-                ; LDA #GS_GAME_OVER
-                ; STA GAME_STATE
+        E_K_DONE
+                ; TODO - JSR SAVE_HI_SCORES
                 
-                ; ; ERASE the ENTRY text
-                ; LDY #$A000 + COLUMNS_PER_LINE*32 + 24
-                ; STY CURSORPOS
+                LDA #GS_GAME_OVER
+                STA GAME_STATE
                 
-                ; LDY #7 ; delete 7 lines
-        ; ER_NEXT_LINE
-                ; LDX #30 ; the number of characters to delete
-                ; LDA #0
+                ; ERASE the ENTRY text
+                LDA MMU_IO_CTRL
+                PHA
+
+                LDA #IO_PAGE2
+                STA MMU_IO_CTRL
                 
-        ; ERASE_ENTRY_LOOP
-                ; STA [CURSORPOS]
-                ; INC CURSORPOS
-                ; DEX
-                ; BNE ERASE_ENTRY_LOOP
+                LDA #<(TEXT_START + COLUMNS_PER_LINE*16 + 28)
+                STA CURSORPOS
+                LDA #>(TEXT_START + COLUMNS_PER_LINE*16 + 28)
+                STA CURSORPOS + 1
                 
-                ; setal
-                ; LDA CURSORPOS
-                ; CLC
-                ; ADC #COLUMNS_PER_LINE - 30
-                ; STA CURSORPOS
-                ; setas
+                LDY #9 ; delete the bottom 9 lines
+        ER_NEXT_LINE
+                LDX #30 ; the number of characters to delete
+                LDA #0
                 
-                ; DEY
-                ; BNE ER_NEXT_LINE
+        ERASE_ENTRY_LOOP
+                STA (CURSORPOS)
+                INC CURSORPOS
+                BNE +
+                INC CURSORPOS + 1 
+           +    DEX
+                BNE ERASE_ENTRY_LOOP
                 
-    DONT_REACT
+                ; clear the next line
+                CLC
+                LDA CURSORPOS
+                ADC #COLUMNS_PER_LINE - 30
+                STA CURSORPOS
+                BCC +
+                INC CURSORPOS + 1
+                
+         +      DEY
+                BNE ER_NEXT_LINE
+                
+                PLA
+                STA MMU_IO_CTRL
+                
+    DONE_ENTRY
                 RTS
-                
-; KEY_JUMP_TABLE
-                ; .word <>INVALID_KEY
-                ; .word <>MOVE_PIECE_LEFT
-                ; .word <>MOVE_PIECE_RIGHT
-                ; .word <>MOVE_PIECE_DOWN
-                ; .word <>ROTATE_PIECE
                 
 
 
@@ -211,8 +287,7 @@ SOF_INTERRUPT
                 ; LOAD_KBD_INPT_BUF
                 ; BRA EMPTY_KBD_BUFFER
         ; GS_KBD_NOT_FULL
-                
-                ; JSR HANDLE_JOYSTICK
+                JSR HANDLE_JOYSTICK
                 
                 LDA GAME_STATE  ; The SOF is still getting called, even when masked
                 BNE CHK_GAME_RESTARTING
@@ -233,31 +308,30 @@ SOF_INTERRUPT
                 CMP #GS_GAME_OVER
                 BNE CHK_REMOVE_LINES
                 
-                ; ; count 60 ticks for 1 second
-                ; LDA GAME_OVER_TICK
-                ; INC A
-                ; STA GAME_OVER_TICK
-                ; CMP #60
-                ; BNE SOF_DONE
+                ; count 60 ticks for 1 second
+                LDA GAME_OVER_TICK
+                INC A
+                STA GAME_OVER_TICK
+                CMP #60
+                BNE SOF_DONE
                 
-                ; LDA #0
-                ; STA GAME_OVER_TICK
-                ; SED
-                ; LDA GAME_OVER_TIMER
-                ; SEC
-                ; SBC #1
-                ; STA GAME_OVER_TIMER
-                ; CLD
-                ; JSR DISPLAY_COUNTDOWN
+                STZ GAME_OVER_TICK
+                SED
+                LDA GAME_OVER_TIMER
+                SEC
+                SBC #1
+                STA GAME_OVER_TIMER
+                CLD
+                JSR DISPLAY_COUNTDOWN
                 
-                ; LDA GAME_OVER_TIMER
-                ; CMP #0
-                ; BNE SOF_DONE
+                LDA GAME_OVER_TIMER
+                CMP #0
+                BNE SOF_DONE
                 
-                ; LDA #GS_INTRO
-                ; STA GAME_STATE
-                ; JSR CLR_SCREEN
-                ; JSR DISPLAY_INTRO
+                LDA #GS_INTRO
+                STA GAME_STATE
+                JSR CLR_SCREEN
+                JSR DISPLAY_INTRO
                 
                 BRA SOF_DONE
                 
@@ -265,7 +339,8 @@ SOF_INTERRUPT
                 
                 CMP #GS_LINE_BONUS
                 BNE CHK_INTRO_SCREEN
-                ; JSR REMOVE_LINES_LOOP
+                JSR REMOVE_LINES_LOOP
+                
                 BRA SOF_DONE
                 
     CHK_INTRO_SCREEN
@@ -273,29 +348,28 @@ SOF_INTERRUPT
                 BNE CHK_ENTRY_SCREEN
                 
                 JSR INTRO_LOOP
+
                 BRA SOF_DONE
                 
     CHK_ENTRY_SCREEN
                 CMP #GS_NAME_ENTRY
                 BNE SOF_DONE
                 
-                ; ; write the user entry
-                ; LDY #$A000 + COLUMNS_PER_LINE * 32 + 40
-                ; STY CURSORPOS
-                ; LDA #$AF
-                ; STA CURSORPOS + 2
-                ; LDA #$23
-                ; STA CURCOLOR
-                
-                ; ; display USER_NAME_ENTRY PROMPT
-                ; setal
-                ; LDA #<>HI_SCORES
-                ; CLC
-                ; ADC TEMP_LOCATION
-                ; STA MSG_ADDR
-                ; setas
+                ; write the user entry
+                LDA #<(TEXT_START + COLUMNS_PER_LINE*16 + 45)
+                STA CURSORPOS
+                LDA #>(TEXT_START + COLUMNS_PER_LINE*16 + 45)
+                STA CURSORPOS + 1
+                LDA #$70
+                STA CURCOLOR
+                LDA #>HI_SCORES
+                STA MSG_ADDR + 1
+                CLC
+                LDA #<HI_SCORES
+                ADC TEMP_LOCATION
+                STA MSG_ADDR
 
-                ; JSR DISPLAY_MSG
+                JSR DISPLAY_MSG
                 
     SOF_DONE
                 RTS
@@ -349,6 +423,7 @@ ADD_CHAR
                 TAX
                 PLA
                 STA HI_SCORES,X
+                INC VKY_CURSOR_X
                 RTS
                 
         A_C_DONE
@@ -366,6 +441,7 @@ DEL_CHAR
                 TAX
                 LDA #'_'
                 STA HI_SCORES,X
+                DEC VKY_CURSOR_X
                 
         D_C_DONE
                 RTS

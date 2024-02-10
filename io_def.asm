@@ -38,7 +38,7 @@ PS2_CTRL      = $D640
     MCLR      = $20
     
 PS2_OUT       = $D641
-KBD_IN        = $D642
+PS2_KBD_IN    = $D642
 MOUSE_IN      = $D643
 PS2_STAT      = $D644
     K_EMPTY   = 1
@@ -55,21 +55,22 @@ MOUSE_PS2_0   = $D6E6 ; only valid in MODE=1
 MOUSE_PS2_1   = $D6E7 ; only valid in MODE=1
 MOUSE_PS2_2   = $D6E8 ; only valid in MODE=1
 
+; VIA 0 and 1 are in reverse addresses
 ; Junior's VIA - For Joystick
-VIA1_IORB     = $DC00
-VIA1_IORA     = $DC01
-VIA1_DDRB     = $DC02
-VIA1_DDRA     = $DC03
-VIA1_INTR_FLG = $DC0D
-VIA1_INTR_REG = $DC0E
+VIA0_IORB     = $DC00
+VIA0_IORA     = $DC01
+VIA0_DDRB     = $DC02
+VIA0_DDRA     = $DC03
+VIA0_INTR_FLG = $DC0D
+VIA0_INTR_REG = $DC0E
 
 ; F256K's VIA - For Matrix Keyboard
-VIA2_IORB     = $DB00
-VIA2_IORA     = $DB01
-VIA2_DDRB     = $DB02
-VIA2_DDRA     = $DB03
-VIA2_INTR_FLG = $DB0D
-VIA2_INTR_REG = $DB0E
+VIA1_IORB     = $DB00
+VIA1_IORA     = $DB01
+VIA1_DDRB     = $DB02
+VIA1_DDRA     = $DB03
+VIA1_INTR_FLG = $DB0D
+VIA1_INTR_REG = $DB0E
 
 ; Dip switch Ports
 DIPSWITCH     = $AFE804  ;(R) $AFE804...$AFE807

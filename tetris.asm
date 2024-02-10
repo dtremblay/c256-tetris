@@ -18,15 +18,14 @@
 .include "math_def.asm"
 .include "page0_inc.asm"
 .include "tiny-vicky.asm"
-
 .include "io_def.asm"
 
-;* = $000500
-;TODO:.include "keyboard_def.asm"
+* = $000500
+.include "keyboard_def.asm"
 
 .include "base.asm"
 
-* = $2000
+* = $1000
 .include "interrupt_handler.asm"
 
 ; ****************************************************
@@ -39,8 +38,8 @@ TARGET_F256        = 3
 COLUMNS_PER_LINE   = 80
 ROW_PER_PAGE       = 60
 INITIAL_GAME_SPEED = 40
-BOARD_WIDTH        = 10
-BOARD_HEIGHT       = 20
+BOARD_WIDTH        = 12
+BOARD_HEIGHT       = 21
 WALL               = 1
 MIDDLE_POSITION    = 3
 
@@ -69,8 +68,8 @@ GAME_STATE      .byte 4
 
 LEVEL           .byte 1
 
-START_TILEMAP     = (TILEMAP + (40*5 + (40-(BOARD_WIDTH+4))/2 + 1)*2)
-NEXT_PIECE_LOC    = (TILEMAP + (40*11 + 32)*2)
+START_TILEMAP     = (TILEMAP + (40*5 + (40-(BOARD_WIDTH))/2)*2)
+NEXT_PIECE_LOC    = (TILEMAP + (40*15 + 30)*2)
 PIECE_VALUE       = $25  ; we're doing BCD additions
 
 EFFECT_T_POSITION = $60 ; 4 bytes
@@ -83,9 +82,9 @@ MSG_ADDR          = $70
 DEL_LINE_PTR      = $70
 ROT_VAL           = $72
 ROT_VAL2          = $73
-LINE_CNTR         = $74
+LINE_CNTR         = $74 ; 1 byte
 COPY_LINE_PTR     = $76
-TOTAL_LINES       = $78 ; reserving 2 bytes
+TOTAL_LINES       = $78 ; 2 bytes
 SRC_PTR           = $72
 DEST_PTR          = $74
 
@@ -109,6 +108,10 @@ CURRENT_POSITION  = $87 ; 2 bytes - the slot 2 byte is used
 LOOP_OFFSET_REG   = $89 ; 3 bytes
 VGM_TEMP          = $8C ; 2 bytes
 KEYPRESSED        = $8E ; 1 byte
+    LEFT_KEY      = 1
+    RIGHT_KEY     = 2
+    SPACE_KEY     = 3
+    DOWN_KEY      = 4
 
 PSG_BASE_ADDRESS  = $D608 ; address to the combined Left/Right address
 OPL3_BASE_ADRESS  = $D580
@@ -122,12 +125,11 @@ HISCORE_OFFSET    = $92 ; 1 byte
 ; ****************************************************
 GAME_START      
                 SEI
-                LDA #0
-                STA KEYBOARD_SC_FLG
-                STA MOUSE_REG               ; disable the mouse pointer
-                STA VKY_CURSOR_CTRL         ; disable the cursor
-                STA EFFECT_PLAY
-                STA HISCORE_OFFSET
+                STZ KEYBOARD_SC_FLG
+                STZ MOUSE_REG               ; disable the mouse pointer
+                STZ VKY_CURSOR_CTRL         ; disable the cursor
+                STZ EFFECT_PLAY
+                STZ HISCORE_OFFSET
                 
                 LDA #1
                 STA LEVEL
@@ -150,6 +152,10 @@ GAME_START
                 LDA #RND_ENABLE + RND_SEED_LOAD
                 STA RND_CTRL
                 
+                ; reset the VIA to read PORT B
+                LDA #0
+                STA VIA1_DDRB
+                
                 JSR LOAD_GAME_ASSETS
                 ; read the hi-score list from disk
                 ; JSR ISDOS_INIT
@@ -162,6 +168,10 @@ GAME_START
                 ; set the display mode to tiles
                 LDA #VKY_Tile_Mode_En + VKY_Bitmap_Mode_En + VKY_Text_Mode_En + VKY_Graph_Mode_En + VKY_Text_Overlay
                 STA VKY_MSTR_CTRL_0
+                
+                ; double y text
+                LDA #4
+                STA VKY_MSTR_CTRL_0 + 1
                 
                 ; enable Random Number Generation
                 LDA #RND_ENABLE
@@ -384,13 +394,14 @@ DISPLAY_BOARD_LOOP
 PICK_NEXT_PIECE
                 LDA NEXT_PIECE
                 STA CURRENT_PIECE
-                
-    PN_TRY_AGAIN
+    
                 LDA RND_L
                 AND #7
-                STA NEXT_PIECE
                 CMP #7
-                BEQ PN_TRY_AGAIN
+                BNE +
+                LDA #0
+          +     STA NEXT_PIECE
+           
                 RTS
 
 ; ****************************************************************337
@@ -399,7 +410,6 @@ PICK_NEXT_PIECE
 LOOK_FOR_LINES
                 STZ ROT_VAL2 ; line count max 4
                 STZ LINE_CNTR
-                STZ LINE_CNTR + 1
     INIT_LINE_CHECK
                 LDY #0
                 STZ ROT_VAL  ; column count max 10
@@ -417,9 +427,9 @@ LOOK_FOR_LINES
                 STA ADDER_A
                 LDA MULU_RES + 1
                 STA ADDER_A + 1
-                LDA #<BOARD
+                LDA #<BOARD + 1
                 STA ADDER_B
-                LDA #>BOARD
+                LDA #>BOARD + 1
                 STA ADDER_B + 1
                 LDA ADDER_RES
                 STA CURSORPOS
@@ -429,17 +439,17 @@ LOOK_FOR_LINES
     CHK_NEXT_COL
                 LDA (CURSORPOS),Y
                 BEQ CHK_NEXT_LINE
-                INC ROT_VAL
+                INC ROT_VAL           ; count the number of cells occupied
                 INY
-                CPY #BOARD_WIDTH
+                CPY #BOARD_WIDTH-2
                 BNE CHK_NEXT_COL
                 
                 LDA ROT_VAL
-                CMP #BOARD_WIDTH
+                CMP #BOARD_WIDTH-2
                 BEQ LINE_FOUND  ; if the count is 14 then we have a full line
                 
     CHK_NEXT_LINE
-                INC ROT_VAL2
+                INC ROT_VAL2    ; only check 4 lines
                 LDA PIECE_Y
                 INC A
                 STA PIECE_Y
@@ -453,6 +463,36 @@ LOOK_FOR_LINES
               
     ; when a line is found, we're going to replace the tiles with "checkered tiles"
 	LINE_FOUND
+                INC LINE_CNTR
+                LDA #GS_LINE_BONUS
+                STA GAME_STATE
+
+                LDA PIECE_Y
+                DEC A
+                STA MULU_A
+                STZ MULU_A + 1
+                LDA #BOARD_WIDTH
+                STA MULU_B
+                STZ MULU_B + 1
+                LDA MULU_RES
+                TAX
+
+                INX ; skip the first columns
+                LDY #0
+                LDA #9
+                STA BOARD,X
+                INX
+                INY
+                LDA #10
+        LINE_CHAR
+                STA BOARD,X
+                INX
+                INY
+                CPY #BOARD_WIDTH-3
+                BNE LINE_CHAR
+                LDA #11
+                STA BOARD,X
+                
 				BRA CHK_NEXT_LINE
 
 ; ****************************************************************416
@@ -477,6 +517,7 @@ GET_PIECE_VALUE
                 
                 ; if rotation is 1, return on of the following
                 ; 12,8,4,0, 13,9,5,1, 14,10,6,2, 15,11,7,3
+                PHX
                 PHX
                 TXA
                 AND #$F0
@@ -529,12 +570,13 @@ GET_PIECE_VALUE
                 TAX
                 LDA PIECE0,X  ; ROTATION 2
                 
-                ;PLX
+                PLX
                 RTS
                 
     ROT_3       
                 ; if rotation is 2, return on of the following
                 ; 15,14,13,12, 11,10,9,8, 7,6,5,4, 3,2,1,0
+                PHX
                 PHX
                 TXA
                 AND #$F0
@@ -564,39 +606,205 @@ GET_PIECE_VALUE
                 ADC ROT_VAL2
                 TAX
                 LDA PIECE0,X  ; ROTATION 3
-                ;PLX
+                PLX
                 RTS
                 
 ; **************************************************************************512
 ; * Handle Joystick Movements
-; * Remember that the joystick at rest returns $9F.
+; * Remember that the joystick at rest returns $FF.
 ; * Poll the joystick 10 times a second.
 ; *****************************************************************************
 HANDLE_JOYSTICK
+                LDA JOYSTICK_POLL
+                INC A
+                STA JOYSTICK_POLL
+                CMP #6
+                BNE JS_DONE
+                
+                
+                STZ JOYSTICK_POLL
+                
+                LDA #<(TEXT_START + 5)
+                STA CURSORPOS
+                LDA #>(TEXT_START + 5)
+                STA CURSORPOS + 1
+                LDA #$20
+                STA CURCOLOR
+                
+                ; DEBUG DISPLAY VIA PORT 0
+                LDX MMU_IO_CTRL
+                LDA #0
+                STA MMU_IO_CTRL
+                LDA VIA0_IORB
+                STX MMU_IO_CTRL
+                
+                PHA
+                JSR DISPLAY_HEX
+                PLA
+                
+                ; we don't care about up #1
+                BIT #2 ; down
+                BNE JS_LEFT
+                
+                STZ BUTTON_PRESS
+                JSR MOVE_PIECE_DOWN
+                BRA JS_DONE
+                
+        JS_LEFT
+                BIT #4 ; left
+                BNE JS_RIGHT
+                
+                STZ BUTTON_PRESS
+                JSR MOVE_PIECE_LEFT
+                BRA JS_DONE
+                
+        JS_RIGHT
+                BIT #8 ; right
+                BNE JS_BUTTON
+                
+                STZ BUTTON_PRESS
+                JSR MOVE_PIECE_RIGHT
+                BRA JS_DONE
+                
+        JS_BUTTON
+                BIT #$10 ; button
+                BNE JS_NONE
+                
+                LDA BUTTON_PRESS
+                BNE JS_DONE
+                
+                LDA #1
+                STA BUTTON_PRESS
+                JSR ROTATE_PIECE
+                RTS
+                
+        JS_NONE
+                STZ BUTTON_PRESS
+        JS_DONE
                 RTS
                 
 ; **************************************************************************569
 ; * User Pressed Left Arrow
 ; *****************************************************************************
 MOVE_PIECE_LEFT
+                LDA GAME_STATE
+                CMP #1 ; user pressed the space bar to restart the game
+                BEQ MOVE_LEFT_DONE
+                
+                LDA PIECE_X
+                DEC A
+                STA PIECE_X
+                JSR DOES_PIECE_FIT
+                LDA PIECE_FIT
+                BEQ MOVE_LEFT_DONE
+                
+                ; collision detected
+                LDA PIECE_X
+                INC A
+                STA PIECE_X
+                LDA #0
+                STA PIECE_FIT
+                
+    MOVE_LEFT_DONE
 				RTS
 
 ; **************************************************************************595
 ; * User Pressed Right Arrow
 ; *****************************************************************************
 MOVE_PIECE_RIGHT
+                LDA GAME_STATE
+                CMP #1 ; user pressed the space bar to restart the game
+                BEQ MOVE_RIGHT_DONE
+                
+                LDA PIECE_X
+                INC A
+                STA PIECE_X
+                JSR DOES_PIECE_FIT
+                LDA PIECE_FIT
+                BEQ MOVE_RIGHT_DONE
+                
+                ; collision detected
+                LDA PIECE_X
+                DEC A
+                STA PIECE_X
+                LDA #0
+                STA PIECE_FIT
+                
+    MOVE_RIGHT_DONE
 				RTS
 
 ; **************************************************************************621
 ; * User Pressed Down Arrow
 ; *****************************************************************************
 MOVE_PIECE_DOWN
+                LDA GAME_STATE
+                CMP #1 ; user pressed the space bar to restart the game
+                BEQ MOVE_DOWN_DONE
+                
+                LDA PIECE_Y
+                INC A
+                STA PIECE_Y
+                
+                JSR DOES_PIECE_FIT
+                LDA PIECE_FIT
+                BEQ MOVE_DOWN_DONE
+                
+                LDA PIECE_Y
+                DEC A
+                STA PIECE_Y
+                LDA #0
+                STA PIECE_FIT
+                
+    MOVE_DOWN_DONE
 				RTS
 
 ; **************************************************************************647
 ; * User Pressed Space Bar
 ; *****************************************************************************
 ROTATE_PIECE
+                LDA GAME_STATE
+                CMP #GS_GAME_OVER ; user pressed the space bar to restart the game
+                BEQ CHANGE_STATE
+
+                CMP #GS_INTRO
+                BNE ROT_START
+    CHANGE_STATE
+                LDA #GS_RESTARTING
+                STA GAME_STATE
+                
+                JSR CLR_SCREEN
+                
+                RTS
+                
+    ROT_START
+                LDA PIECE_ROT
+                INC A
+                CMP #4
+                BNE ROTATE_CHECK_COLLISION
+                LDA #0
+    ROTATE_CHECK_COLLISION
+                STA PIECE_ROT
+                JSR DOES_PIECE_FIT
+                LDA PIECE_FIT
+                BEQ ROTATE_DONE
+                
+                LDA #0
+                STA PIECE_FIT
+                
+                ; collision detected
+                LDA PIECE_ROT
+                BEQ ROTATE_3
+                DEC A
+                BRA UNDO_ROT_COLISION
+                
+    ROTATE_3
+                LDA #3
+    UNDO_ROT_COLISION
+                STA PIECE_ROT
+                RTS
+                
+    ROTATE_DONE
+                ;JSR PLAY_EFFECT_ROTATE
 				RTS
 
 ; **************************************************************************695
@@ -618,7 +826,7 @@ COPY_PIECE
                 STA MULU_B
                 STZ MULU_B+1
                 ; ignore the second byte of the multiplication
-                CLC
+                SEC
                 LDA MULU_RES
                 ADC PIECE_X
                 TAY
@@ -672,7 +880,7 @@ DOES_PIECE_FIT
                 STA MULU_B
                 STZ MULU_B+1
                 
-                CLC
+                SEC
                 LDA MULU_RES
                 ADC PIECE_X
                 TAY
@@ -735,10 +943,6 @@ DRAW_BOARD
                 STA (CURSORPOS),Y ; the tile
                 INY
                 INY
-                LDA #WALL
-                STA (CURSORPOS),Y ; the tile
-                INY
-                INY
                 
           -     LDA BOARD,X
                 STA (CURSORPOS),Y ; the tile
@@ -754,10 +958,6 @@ DRAW_BOARD
                 STA (CURSORPOS),Y ; the tile
                 INY
                 INY
-                LDA #WALL
-                STA (CURSORPOS),Y ; the tile
-                INY
-                INY
                 INC CURCOLOR ; increment the row count
                 
                 ; calculate the offset to the next row of tiles
@@ -769,7 +969,7 @@ DRAW_BOARD
                 INC CURSORPOS + 1
                 
          +      LDA CURCOLOR
-                CMP #BOARD_HEIGHT + 1
+                CMP #BOARD_HEIGHT
                 BNE DB_INNER
                 
                 ; now draw the two bottom row(s)
@@ -778,7 +978,7 @@ DRAW_BOARD
                 STA (CURSORPOS),Y
                 INY
                 INY
-                CPY #(BOARD_WIDTH + 4) * 2
+                CPY #(BOARD_WIDTH + 2) * 2
                 BNE -
                 
                 RTS
@@ -860,7 +1060,7 @@ DRAW_PIECE
 ; * with sprites, but this would use more memory.
 ; ***************************************************************
 DRAW_NEXT_PIECE
-                display_text 56, 19, $20, NEXT_TILE_MSG
+                display_text 56, 13, $20, NEXT_TILE_MSG
                 
                 LDA #<NEXT_PIECE_LOC
                 STA CURSORPOS
@@ -905,29 +1105,12 @@ DRAW_NEXT_PIECE
                 BNE DNP_SYMBOL_NEXT_LINE
                 
                 RTS
-      
-; *************************************************************************992
-; * Draw Score      
-; ****************************************************************************
-DRAW_SCORE
-                display_text 56,5,$20,SCORE_MSG
-                CLC
-                LDA CURSORPOS
-                ADC #8
-                STA CURSORPOS
-                LDA SCORE + 2
-                JSR DISPLAY_HEX
-                LDA SCORE + 1
-                JSR DISPLAY_HEX
-                LDA SCORE
-                JSR DISPLAY_HEX
-                RTS
                 
 ; ************************************************************************1015
 ; * Draw High Scores     
 ; ****************************************************************************
 DRAW_HI_SCORES
-                display_text 3,5,$20,HI_SCORE_MSG
+                display_text 3, 5, $20, HI_SCORE_MSG
                 
                 ; prepare to write the high scores
                 LDA #<(TEXT_START + COLUMNS_PER_LINE*6 + 3)
@@ -989,11 +1172,29 @@ DRAW_HI_SCORES
 
                 RTS
                 
+; *************************************************************************992
+; * Draw Score      
+; ****************************************************************************
+DRAW_SCORE
+                display_text 56, 5, $20, SCORE_MSG
+                
+                CLC
+                LDA CURSORPOS
+                ADC #8
+                STA CURSORPOS
+                LDA SCORE + 2
+                JSR DISPLAY_HEX
+                LDA SCORE + 1
+                JSR DISPLAY_HEX
+                LDA SCORE
+                JSR DISPLAY_HEX
+                RTS
+
 ; ************************************************************************1076
 ; * Draw Level  
 ; ****************************************************************************
 DRAW_LEVEL
-                display_text 56,7,$20,LEVEL_MSG
+                display_text 56, 7, $20, LEVEL_MSG
                 
                 ; right align the level with the score above
                 CLC
@@ -1009,7 +1210,7 @@ DRAW_LEVEL
 ; * Draw Lines  
 ; ****************************************************************************
 DRAW_LINES
-                display_text 56,13, $20, LINES_MSG
+                display_text 56, 9, $20, LINES_MSG
                 
                 ; right align the level with the score above
                 CLC
@@ -1021,6 +1222,106 @@ DRAW_LINES
                 JSR DISPLAY_HEX
                 LDA TOTAL_LINES
                 JSR DISPLAY_HEX
+                RTS
+
+; *******************************************************************
+; * This routine will display the "BONUS" for 50 ticks and 
+; * then delete the lines.
+; *******************************************************************
+REMOVE_LINES_LOOP
+                LDA TICK_COUNT
+                INC A
+                STA TICK_COUNT
+                CMP #1
+                BNE WAIT_FOR_50
+                
+                ; display bonus message
+                display_text 56, 11, $20, BONUS_MSG
+                
+                LDA CURSORPOS
+                ADC #8
+                STA CURSORPOS
+                
+                LDX LINE_CNTR
+                LDA BONUS,X
+                JSR DISPLAY_HEX
+                
+                LDA #0
+                JSR DISPLAY_HEX
+                ; play sound effect
+                ;JSR PLAY_EFFECT_LINE
+                
+                BRA SKIP_DELETE_LINES
+    WAIT_FOR_50
+                CMP #50
+                BNE SKIP_DELETE_LINES
+                
+                ; delete the bonus line
+                LDA #<TEXT_START + COLUMNS_PER_LINE * 11 + 56
+                STA CURSORPOS
+                LDA #>TEXT_START + COLUMNS_PER_LINE * 11 + 56
+                STA CURSORPOS + 1
+                LDA #0
+                LDY #0
+                
+                ; switch the io page
+                LDA MMU_IO_CTRL
+                PHA
+                
+                LDA #IO_PAGE2
+                STA MMU_IO_CTRL
+        CLEAR_BONUS_LP
+                STA (CURSORPOS),Y
+                INY
+                CPY #16
+                BNE CLEAR_BONUS_LP
+                
+                ; restore the MMU IO page
+                PLA
+                STA MMU_IO_CTRL
+                
+                ; add the bonus to the score
+                LDX LINE_CNTR
+                LDA BONUS,X
+                
+                ;XBA ; multiply by 256
+                ;LDA #0
+                ;setal
+                SED
+                CLC 
+                ADC SCORE + 1
+                STA SCORE + 1
+                BCC CB_CONT1 ; check carry
+                
+                ; increment the hi-byte
+                LDA SCORE+2
+                ADC #0
+                STA SCORE+2
+        CB_CONT1
+                ; calculate the number of total lines
+                LDA LINE_CNTR
+                CLC
+                ADC TOTAL_LINES
+                STA TOTAL_LINES
+                BCC CB_CONT2  ; check carry
+                
+                ; increment the hundreds lines
+                LDA TOTAL_LINES + 1
+                ADC #0
+                STA TOTAL_LINES + 1
+                
+                ;setas
+        CB_CONT2
+                CLD
+                ; delete the lines
+                JSR DELETE_LINES
+                
+                ; reset the game state
+                LDA #0
+                STA TICK_COUNT
+                STA GAME_STATE
+                
+    SKIP_DELETE_LINES
                 RTS
                 
 ; *************************************************************************1219
@@ -1062,26 +1363,6 @@ DISPLAY_MSG
 ; * Game Over screen
 ; *****************************************************************************
 GAME_OVER
-                ; check if the score is one of the 10 highest
-                ;JSR CHECK_SCORE
-                
-                LDA HISCORE_LINE
-                CMP #10
-                BEQ NOT_A_HISCORE
-                
-                ; show the user name entry screen
-                LDA #GS_NAME_ENTRY
-                BRA G_O_RESUME
-                
-        NOT_A_HISCORE
-                LDA #GS_GAME_OVER
-        G_O_RESUME
-                STA GAME_STATE
-                LDA #0
-                STA GAME_OVER_TICK
-                LDA #$30
-                STA GAME_OVER_TIMER
-                
                 LDA #$0 ; disable the tiles
                 STA VKY_TILEMAP0_CTRL
                 STA VKY_TILEMAP1_CTRL
@@ -1098,13 +1379,61 @@ GAME_OVER
                 
                 JSR CLR_SCREEN
                 
+                ; clear the board
+                dma_fill_2d 0, BOARD+1, 10, 20, 12
+                
+                LDA #0
+                STA PIECE_Y
+                
+                ; check if the score is one of the 10 highest
+                JSR CHECK_SCORE
+                
+                LDA HISCORE_LINE
+                CMP #10
+                BEQ NOT_A_HISCORE
+                
+                ; show the user name entry screen
+                ; display USER_NAME_ENTRY PROMPT
+                display_text 28, 16, $30, ENTER_USERNAME_MSG
+                
+                ; display Backspace message
+                display_text 28, 22, $30, BKSP_MSG
+                ; display Press Return when done message
+                display_text 28, 24, $30, RETURN_DONE_MSG
+                
+                ; show the cursor
+                LDA #VKY_CURSOR_EN + VKY_CURSOR_RATE_25
+                STA VKY_CURSOR_CTRL
+                ; set the cursor position
+                LDA #45
+                STA VKY_CURSOR_X
+                LDA #16
+                STA VKY_CURSOR_Y
+                
+                LDA #GS_NAME_ENTRY
+                BRA G_O_RESUME
+                
+        NOT_A_HISCORE
+                LDA #GS_GAME_OVER
+        G_O_RESUME
+                STA GAME_STATE
+                LDA #0
+                STA GAME_OVER_TICK
+                LDA #$30  ; BCD Value to countdown
+                STA GAME_OVER_TIMER
+                
+                
                 ; display GAME OVER
-                display_text 31, 26, $23, GAME_OVER_MSG
+                display_text 35, 6, $30, GAME_OVER_MSG
                 ; display SCORE text
-                display_text 29, 27, $20, SCORE_MSG
+                display_text 33, 8, $30, SCORE_MSG
                 
                 ; display the numerical score
-                INC CURSORPOS
+                CLC
+                LDA CURSORPOS
+                ADC #7
+                STA CURSORPOS
+                
                 LDA SCORE + 2
                 JSR DISPLAY_HEX
                 LDA SCORE + 1
@@ -1116,30 +1445,19 @@ GAME_OVER
                 CMP #GS_NAME_ENTRY
                 BNE G_O_SKIP_ENTRY_MSG
                 
-                ; display Press Return when done message
-                display_text 24, 36, $20, RETURN_DONE_MSG
-                
-                ; display Backspace message
-                display_text 24, 37, $20, BKSP_MSG
-                
-                ; display USER_NAME_ENTRY PROMPT
-                display_text 24, 32, $23, ENTER_USERNAME_MSG
-                
         G_O_SKIP_ENTRY_MSG
                 JSR DISPLAY_COUNTDOWN
-                
-                ; clear the board
-                dma_fill 0, BOARD, BOARD_WIDTH*BOARD_HEIGHT
-                
-                LDA #0
-                STA PIECE_Y
                 
 				RTS
                 
 DISPLAY_COUNTDOWN
                 ; display RESTART
-                display_text 29, 29, $20, RESTART_MSG
+                display_text 33, 10, $30, RESTART_MSG
                 
+                CLC
+                LDA CURSORPOS
+                ADC #11
+                STA CURSORPOS
                 ; the countdown timer is in BCD
                 LDA GAME_OVER_TIMER
                 JSR DISPLAY_HEX
@@ -1206,6 +1524,65 @@ DISPLAY_HEX
                 PLX
                 RTS
     
+; *****************************************************************************
+; * Delete the full lines - start from the bottom of the board.
+; *****************************************************************************
+DELETE_LINES
+                ;.as
+                ;PHB
+                ;setal
+                LDA LINE_CNTR
+                AND #$F
+                ; if 0 then there are no lines to delete and we shouldn't have gotten here
+                BEQ DELETE_LINES_DONE
+                
+                ; find the deleted lines - starting at the bottom
+                LDA #BOARD_WIDTH * (BOARD_HEIGHT-2) +1 
+        LOOK_UP
+                STA BYTE_CNTR
+                
+                TAX
+        DL_CHECK_NEXT
+                
+                LDA BOARD,X
+                CMP #9  ; look for the crop-end tile
+                BNE DONT_DELETE
+                
+                PHX
+                
+                ; move the board tiles down
+                ; this may look a little awkward, but this is because
+                ; we're copying the board bytes backwards
+                DEX
+        -       LDA BOARD,X
+                STA BOARD+BOARD_WIDTH,X
+                DEX
+                CPX #BOARD_WIDTH
+                BNE -
+                
+                PLX
+                
+                ; check the next line
+                LDA LINE_CNTR
+                AND #$F
+                DEC A
+                STA LINE_CNTR
+                
+                BNE DL_CHECK_NEXT
+                
+                BRA DELETE_LINES_DONE
+                
+        DONT_DELETE
+                LDA BYTE_CNTR
+                SEC
+                SBC #BOARD_WIDTH
+                BRA LOOK_UP
+                
+    DELETE_LINES_DONE
+                ;setas
+                ;PLB
+                RTS
+                
 ; *************************************************************************1498
 ; * Load Game Assets in memory
 ; * We're using two tilemaps: 0 is the game board, 1 is the intro "C256 Foenix"
@@ -1323,7 +1700,7 @@ INIT_GAME
                 STA LEVEL
                 
                 ; clear board and tilemap
-                dma_fill 0, BOARD, BOARD_WIDTH*BOARD_HEIGHT
+                dma_fill_2d 0, BOARD+1, 10, 20, 12
                 dma_fill 0, TILEMAP, 40*30*2
                 
                 ; disable the intro tiles
@@ -1439,9 +1816,10 @@ DISPLAY_INTRO
                 STA SONG_START + 1
                 JSR VGM_SET_SONG_POINTERS
                 
-                display_text 29, 47, $70, INTRO_MSG
-                display_text 23, 49, $70, MACHINE_DESIGNER_MSG
-                display_text 23, 51, $70, SOFTWARE_DEV_MSG
+                display_text 29, 23, $70, INTRO_MSG
+                display_text 23, 24, $70, MACHINE_DESIGNER_MSG
+                display_text 23, 25, $70, SOFTWARE_DEV_MSG
+                display_text 29, 27, $B0, SPACE_TO_START
                 
                 LDA #0
                 STA INTRO_SLIDE_CNT
@@ -1449,6 +1827,86 @@ DISPLAY_INTRO
                 ; enable tile layer 1
                 LDA #VKY_TILEMAP_EN | VKY_TILEMAP_8
                 STA VKY_TILEMAP1_CTRL
+                RTS
+                
+; *****************************************************************************
+; * Compare the player score with the 10 highest
+; * If one is found to be lower, then insert a new line (drop the last line) 
+; * and write the score there
+; *****************************************************************************
+CHECK_SCORE     
+                STZ HISCORE_LINE
+                STZ HISCORE_OFFSET
+                STZ TEMP_LOCATION
+                LDX #0
+
+        C_S_LOOP
+                LDA HI_SCORES+9,X
+                CMP SCORE+2
+                BLT C_S_INSERT_LINE
+                BNE C_S_NEXT
+                
+                LDA HI_SCORES+8,X
+                CMP SCORE+1
+                BLT C_S_INSERT_LINE
+                BNE C_S_NEXT
+                
+                LDA HI_SCORES+7,X
+                CMP SCORE
+                BLT C_S_INSERT_LINE
+                
+        C_S_NEXT
+                INC HISCORE_LINE
+                TXA
+                CLC
+                ADC #10
+                STA TEMP_LOCATION
+                TAX
+                
+                LDA HISCORE_LINE
+                CMP #10
+                BNE C_S_LOOP
+                BRA C_S_DONE
+                
+    C_S_INSERT_LINE
+                
+                ; start moving byte starting from the end
+                LDX #100-10
+        C_S_INSERT_LINE_LOOP
+                LDA HI_SCORES,X-1
+                STA HI_SCORES+10,X-1
+                DEX
+                CPX TEMP_LOCATION
+                BNE C_S_INSERT_LINE_LOOP
+                
+                ; copy _ in the first 6 characters,then 0, and then the player score
+                LDA #0
+                LDY #6
+                ;XBA
+                LDA TEMP_LOCATION
+                TAX
+                LDA #'_'
+        CS_EMPTY_CHAR_LOOP
+                STA HI_SCORES,X
+                INX
+                DEY
+                BNE CS_EMPTY_CHAR_LOOP
+                LDA #0
+                STA HI_SCORES,X
+                INX
+                
+                LDA SCORE
+                STA HI_SCORES,X
+                INX
+                
+                LDA SCORE+1
+                STA HI_SCORES,X
+                INX
+                
+                LDA SCORE+2
+                STA HI_SCORES,X
+    
+        C_S_DONE
                 RTS
                 
 .include "vgm_player.asm"
@@ -1464,13 +1922,14 @@ BONUS_MSG       .text 'BONUS:  ',0
 LINES_MSG       .text 'LINES:  ',0
 NEXT_TILE_MSG   .text 'NEXT PIECE:',0
 RESTART_MSG     .text 'Restart in ',0
-INTRO_MSG       .text 'Welcome to C256 Tetris',0
+INTRO_MSG       .text 'Welcome to F256 Tetris',0
 MACHINE_DESIGNER_MSG .text 'Hardware Designer: Stefany Allaire',0
 SOFTWARE_DEV_MSG     .text 'Software Developer: Daniel Tremblay',0
 HI_SCORE_MSG    .text 'HI SCORES:',0
 ENTER_USERNAME_MSG .text 'ENTER USER NAME:',0
 RETURN_DONE_MSG .text 'Press <Enter> when done', 0
 BKSP_MSG        .text 'Press <Bksp> to delete', 0
+SPACE_TO_START  .text 'Press <Space> to start', 0
 BYTE_CNTR       .word 0
 SCORE_PATH      .text 'tetris.scr',0
 
@@ -1517,8 +1976,7 @@ PIECE6
     .byte 0,0,0,0
 
 BOARD
-    .fill BOARD_HEIGHT*BOARD_WIDTH, 0
-    .fill BOARD_WIDTH,6
+    .fill (BOARD_HEIGHT+1)*(BOARD_WIDTH+2), 1  ; 21 * 12 = 252!
 
 TILEMAP
     .fill 40*30*2, 0  ; the board is 40 x 30 - each tile is 2 bytes

@@ -14,7 +14,7 @@ dma_fill    .macro
             sta DMA_DST_ADDR
             lda #>\2
             sta DMA_DST_ADDR+1
-            lda #`\2
+            lda #bank(\2)
             and #$03
             sta DMA_DST_ADDR+2
 
@@ -58,7 +58,7 @@ dma_fill_2d .macro
             sta DMA_DST_ADDR
             lda #>\2
             sta DMA_DST_ADDR+1
-            lda #`\2
+            lda #bank(\2)
             and #$03
             sta DMA_DST_ADDR+2
 
