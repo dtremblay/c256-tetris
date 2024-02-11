@@ -828,7 +828,7 @@ VGM_INIT_TIMERS
             STA TIMER1_CMP+2
             
             restart_timer0
-            restart_timer1
+            ;restart_timer1
 
             RTS
             

@@ -136,3 +136,74 @@ KEYBOARD_TO_CHAR
 .byte $00   ; $81 nothing	
 .byte $00   ; $82 nothing	
 .byte $00	; $83  F7 pressed
+
+; the matrix has 60 keys
+KEYMATRIX_TO_CHAR
+.byte $00   ; $00 delete key
+.byte '3'   ; $01 3 pressed
+.byte '5'   ; $02 5 pressed
+.byte '7'   ; $03 7 pressed
+.byte '9'   ; $04 9 pressed
+.byte '-'   ; $05 - pressed
+.byte '+'   ; $06 + pressed
+.byte '1'   ; $07 1 pressed
+.byte $00   ; $08 RETURN pressed
+.byte 'W'   ; $09 W pressed
+.byte 'R'   ; $0A R pressed
+.byte 'Y'   ; $0B Y pressed
+.byte 'I'   ; $0C I pressed
+.byte 'P'   ; $0D P pressed
+.byte $00   ; $0E ] pressed
+.byte $00   ; $0F BKSPC pressed
+
+.byte $00   ; $10 LEFT key
+.byte 'A'   ; $11 A pressed
+.byte 'D'   ; $12 D pressed
+.byte 'G'   ; $13 G pressed
+.byte 'J'   ; $14 J pressed
+.byte 'L'   ; $15 L pressed
+.byte $00   ; $16 ; pressed
+.byte $00   ; $17 CTRL pressed
+
+.byte $00   ; $18 ?? pressed
+.byte 'W'   ; $19 W pressed
+.byte 'R'   ; $1A R pressed
+.byte 'Y'   ; $1B Y pressed
+.byte 'I'   ; $1C I pressed
+.byte 'P'   ; $1D P pressed
+.byte $00   ; $1E \ pressed
+.byte $00   ; $1F BKSPC pressed
+
+.byte $00   ; $20 F1 key
+.byte 'Z'   ; $21 Z pressed
+.byte 'C'   ; $22 C pressed
+.byte 'B'   ; $23 B pressed
+.byte 'M'   ; $24 M pressed
+.byte '.'   ; $25 . pressed
+.byte $00   ; $26 RSHIFT pressed
+.byte $00   ; $27 SPACE pressed
+.byte $00   ; $28 F3 pressed
+.byte 'S'   ; $29 S pressed
+.byte 'F'   ; $2A F pressed
+.byte 'H'   ; $2B H pressed
+.byte 'K'   ; $2C K pressed
+.byte $00   ; $2D ' pressed
+.byte $00   ; $2E ALT pressed
+.byte $00   ; $2F FOENIX pressed
+
+.byte $00   ; $30 F5 key
+.byte 'E'   ; $31 E pressed
+.byte 'T'   ; $32 T pressed
+.byte 'U'   ; $33 U pressed
+.byte 'O'   ; $34 O pressed
+.byte $00   ; $35 [ pressed
+.byte $00   ; $36 TAB pressed
+.byte 'Q'   ; $37 Q pressed
+.byte $00   ; $38 UP pressed
+.byte $00   ; $39 SHIFT pressed
+.byte 'X'   ; $3A X pressed
+.byte 'V'   ; $3B V pressed
+.byte 'N'   ; $3C N pressed
+.byte $00   ; $3D , pressed
+.byte $00   ; $3E / pressed
+.byte $00   ; $3F BKSPC pressed

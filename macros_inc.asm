@@ -71,3 +71,4 @@ copy_io_data    .macro
                 
 ; a function to return the correct bank even with 6502 processors
 bank            .sfunction _label, `_label.__offset__
+full_addr       .sfunction _label, _label.__offset__

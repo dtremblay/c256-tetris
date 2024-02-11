@@ -112,6 +112,7 @@ KEYPRESSED        = $8E ; 1 byte
     RIGHT_KEY     = 2
     SPACE_KEY     = 3
     DOWN_KEY      = 4
+KBD_POLL          = $8F ; matrix keyboard poll counter
 
 PSG_BASE_ADDRESS  = $D608 ; address to the combined Left/Right address
 OPL3_BASE_ADRESS  = $D580
@@ -180,13 +181,19 @@ GAME_START
                 JSR CLR_SCREEN ; clears the text
                 
     NEXT_GAME
+                ; DONTWORK : enable the matrix keyboard interrupts in VIA1
+                ;LDA #$FF
+                ;STA VIA0_INTR_FLG  ; clear all flags
+                ;LDA #VIA_IRQ_SET + VIA_IRQ_CA1_EN
+                ;STA VIA1_INTR_REG
                 
-                ; Enable SOF and TIMER0 and PS2 Keyboard 
-                LDA #~(INT0_VKY_SOF | INT0_TIMER_0 | INT0_PS2_KBD )
+                ; Enable SOF and TIMER0 and PS2 Keyboard
+                ; Joystick interrupts do not work
+                LDA #~(INT0_VKY_SOF | INT0_TIMER_0 | INT0_PS2_KBD)
                 STA INT_MASK_REG0
-                ; Enable Joystick and F256K Keyboard
-                LDA #~( INT1_VIA0 | INT1_VIA0 | INT1_VIA1 )
-                STA INT_MASK_REG1
+                ; DONTWORK Enable F256K Matrix Keyboard interrupts
+                ;LDA #~(INT1_VIA1)
+                ;STA INT_MASK_REG1
                 
                 LDA GAME_STATE
                 CMP #GS_INTRO
@@ -607,80 +614,6 @@ GET_PIECE_VALUE
                 TAX
                 LDA PIECE0,X  ; ROTATION 3
                 PLX
-                RTS
-                
-; **************************************************************************512
-; * Handle Joystick Movements
-; * Remember that the joystick at rest returns $FF.
-; * Poll the joystick 10 times a second.
-; *****************************************************************************
-HANDLE_JOYSTICK
-                LDA JOYSTICK_POLL
-                INC A
-                STA JOYSTICK_POLL
-                CMP #6
-                BNE JS_DONE
-                
-                
-                STZ JOYSTICK_POLL
-                
-                LDA #<(TEXT_START + 5)
-                STA CURSORPOS
-                LDA #>(TEXT_START + 5)
-                STA CURSORPOS + 1
-                LDA #$20
-                STA CURCOLOR
-                
-                ; DEBUG DISPLAY VIA PORT 0
-                LDX MMU_IO_CTRL
-                LDA #0
-                STA MMU_IO_CTRL
-                LDA VIA0_IORB
-                STX MMU_IO_CTRL
-                
-                PHA
-                JSR DISPLAY_HEX
-                PLA
-                
-                ; we don't care about up #1
-                BIT #2 ; down
-                BNE JS_LEFT
-                
-                STZ BUTTON_PRESS
-                JSR MOVE_PIECE_DOWN
-                BRA JS_DONE
-                
-        JS_LEFT
-                BIT #4 ; left
-                BNE JS_RIGHT
-                
-                STZ BUTTON_PRESS
-                JSR MOVE_PIECE_LEFT
-                BRA JS_DONE
-                
-        JS_RIGHT
-                BIT #8 ; right
-                BNE JS_BUTTON
-                
-                STZ BUTTON_PRESS
-                JSR MOVE_PIECE_RIGHT
-                BRA JS_DONE
-                
-        JS_BUTTON
-                BIT #$10 ; button
-                BNE JS_NONE
-                
-                LDA BUTTON_PRESS
-                BNE JS_DONE
-                
-                LDA #1
-                STA BUTTON_PRESS
-                JSR ROTATE_PIECE
-                RTS
-                
-        JS_NONE
-                STZ BUTTON_PRESS
-        JS_DONE
                 RTS
                 
 ; **************************************************************************569
@@ -1368,13 +1301,21 @@ GAME_OVER
                 STA VKY_TILEMAP1_CTRL
                 
                 ; load the game over music
-                LDA #bank(VGM_GAME_OVER_MUSIC)
+                LDA #ACT_EDIT + ACT_ED_L0
+                STA MMU_MEM_CTRL
+                
+                LDA #(full_addr(VGM_GAME_OVER_MUSIC) / $2000)
+                STA 8+2  ; store in MMU
                 STA CURRENT_POSITION + 2
                 STA SONG_START + 2
-                LDA #<VGM_GAME_OVER_MUSIC
+                LDA #0
+                STA MMU_MEM_CTRL
+                
+                LDA #<(2 * $2000 + (full_addr(VGM_GAME_OVER_MUSIC) % $2000))
                 STA SONG_START
-                LDA #>VGM_GAME_OVER_MUSIC
+                LDA #>(2 * $2000 + (full_addr(VGM_GAME_OVER_MUSIC) % $2000))
                 STA SONG_START + 1
+                
                 JSR VGM_SET_SONG_POINTERS
                 
                 JSR CLR_SCREEN
@@ -1465,7 +1406,7 @@ DISPLAY_COUNTDOWN
                 RTS
 ; *************************************************************************1386
 ; * Display Hex value at CURSORPOS, with color CURCOLOR
-; * Value to display is in A
+; * Value to display is in A 
 ; *****************************************************************************  
 DISPLAY_HEX
                 PHX
@@ -1518,8 +1459,8 @@ DISPLAY_HEX
                 INC CURSORPOS
                 
                 ; restore MMU IO PAGE
-                PLA
-                STA MMU_IO_CTRL
+                PLX
+                STX MMU_IO_CTRL
                 
                 PLX
                 RTS
@@ -1714,15 +1655,16 @@ INIT_GAME
                 STA MMU_MEM_CTRL
                 
                 LDA #(VGM_PLAY_MUSIC / $2000)
+                LDA #(full_addr(VGM_PLAY_MUSIC) / $2000)
                 STA SONG_START + 2
                 STA 8+2
                 LDA #0
                 STA MMU_MEM_CTRL
                 
                 ; load the game music - slot 2 should be set to the hi-byte
-                LDA #<(2 * $2000 + (VGM_PLAY_MUSIC % $2000))
+                LDA #<(2 * $2000 + (full_addr(VGM_PLAY_MUSIC) % $2000))
                 STA SONG_START
-                LDA #>(2 * $2000 + (VGM_PLAY_MUSIC % $2000))
+                LDA #>(2 * $2000 + (full_addr(VGM_PLAY_MUSIC) % $2000))
                 STA SONG_START + 1
                 JSR VGM_SET_SONG_POINTERS
                 
@@ -1801,7 +1743,7 @@ DISPLAY_INTRO
                 ; switch slot 5 ($A000) to point to the tiles area $1_0000 (slot 8)
                 LDA #ACT_EDIT + ACT_ED_L0
                 STA MMU_MEM_CTRL
-                LDA #(VGM_INTRO_MUSIC / $2000)
+                LDA #(full_addr(VGM_INTRO_MUSIC) / $2000)
                 STA 8+2
                 STA SONG_START + 2
                 LDA #($1_0000 / $2000)
@@ -1810,9 +1752,9 @@ DISPLAY_INTRO
                 STA MMU_MEM_CTRL
                 
                 ; load the intro music - slot 2 should be set to the hi-byte
-                LDA #<(2 * $2000 + (VGM_INTRO_MUSIC % $2000))
+                LDA #<(2 * $2000 + (full_addr(VGM_INTRO_MUSIC) % $2000))
                 STA SONG_START
-                LDA #>(2 * $2000 + (VGM_INTRO_MUSIC % $2000))
+                LDA #>(2 * $2000 + (full_addr(VGM_INTRO_MUSIC) % $2000))
                 STA SONG_START + 1
                 JSR VGM_SET_SONG_POINTERS
                 

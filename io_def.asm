@@ -63,6 +63,15 @@ VIA0_DDRB     = $DC02
 VIA0_DDRA     = $DC03
 VIA0_INTR_FLG = $DC0D
 VIA0_INTR_REG = $DC0E
+    VIA_IRQ_SET     = $80
+    VIA_IRQ_TMR1_EN = $40
+    VIA_IRQ_TMR2_EN = $20
+    VIA_IRQ_CB1_EN  = $10
+    VIA_IRQ_CB2_EN  = $08
+    VIA_IRQ_SHR_EN  = $04
+    VIA_IRQ_CA1_EN  = $02
+    VIA_IRQ_CA2_EN  = $01
+   
 
 ; F256K's VIA - For Matrix Keyboard
 VIA1_IORB     = $DB00

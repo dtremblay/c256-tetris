@@ -37,7 +37,7 @@ CHECK_PENDING_REG1
                 BEQ CHECK_PENDING_REG2   ; BEQ EXIT_IRQ_HANDLE
 ; Keyboard Interrupt
                 ;check_irq_bit INT_PENDING_REG1, INT1_VIA0, JOYSTICK_INTERRUPT
-                check_irq_bit INT_PENDING_REG1, INT1_VIA1, KEYBOARD_INTERRUPT_MATRIX
+                ;DONTWORK check_irq_bit INT_PENDING_REG1, INT1_VIA1, KEYBOARD_INTERRUPT_MATRIX
 
 ; Third Block of 8 Interrupts
 CHECK_PENDING_REG2
@@ -52,55 +52,6 @@ EXIT_IRQ_HANDLE
                 RTI
 
 ; ****************************************************************
-;
-;  MATRIX Keyboard
-;
-; ****************************************************************
-KEYBOARD_INTERRUPT_MATRIX
-                LDA #$FF
-                STA VIA1_DDRB 
-                
-                LDA #~%0000_0100
-                STA VIA1_IORB
-                LDA VIA1_IORA
-                BIT #2  ; check if the A key is pressed
-                BNE +
-                
-                LDA #LEFT_KEY
-                STA KEYPRESSED
-                BRA KIM_END
-                
-         +      LDA VIA1_IORA
-                BIT #4   ; check if the D key is pressed
-                BNE +
-                
-                LDA #RIGHT_KEY
-                STA KEYPRESSED
-                BRA KIM_END
-                
-         +      LDA #~%0001_0000
-                STA VIA1_IORB ; check if the SPACE key is pressed
-                LDA VIA1_IORA
-                BIT #$80
-                BNE KIM_END
-                
-                LDA #SPACE_KEY
-                STA KEYPRESSED
-                
-                LDA GAME_STATE
-                CMP #GS_INTRO
-                BNE KIM_END
-                
-                ; the user has pressed a key change the game state to play
-                LDA #GS_RESTARTING
-                STA GAME_STATE
-                ; this routine calls the DMA - must be done here?
-                JSR CLR_SCREEN
-                
-    KIM_END     
-                RTS
-
-; ****************************************************************
 ; * The only keys accepted are Left Arrow, Right Arrow, Down Arrow and Space (to rotate)
 ; * Alias ASD keys to arrows?
 ; ****************************************************************
@@ -110,9 +61,6 @@ KEYBOARD_INTERRUPT_PS2
                 STA KEYPRESSED
                 BEQ DONT_REACT        ; if 0 then don't do anything
                 
-                CMP #$7F              ; ignore any keys above $7F
-                BGE DONT_REACT
-                
                 ; for debugging - display the key
                 LDA #<(TEXT_START + 60)
                 STA CURSORPOS
@@ -121,12 +69,17 @@ KEYBOARD_INTERRUPT_PS2
                 LDA #$50
                 STA CURCOLOR
                 LDA KEYPRESSED
+                
                 JSR DISPLAY_HEX
                 
-                CMP #$7F
+                
+                CMP #$7F              ; ignore any keys above $7F
                 BGE DONT_REACT
                 
                 LDA GAME_STATE
+                CMP #GS_LINE_BONUS
+                BEQ DONT_REACT
+                
                 CMP #GS_INTRO
                 BNE NOT_INTRO
                 
@@ -204,24 +157,8 @@ KEYBOARD_INTERRUPT_PS2
                 BRA DONT_REACT
                 
     NE_ENTER_KEY
-                ; hide the cursor
-                STZ VKY_CURSOR_CTRL
-                
-                ; replace all _ with space
-                LDA HISCORE_OFFSET
-                CMP #6
-                BEQ E_K_DONE
-                
-                CLC
-                ADC TEMP_LOCATION
-                
-                TAX
-                LDA #$20
-                STA HI_SCORES,X
-                INC HISCORE_OFFSET
-                BRA NE_ENTER_KEY
-                
-        E_K_DONE
+                JSR COMPLETE_ENTRY
+
                 ; TODO - JSR SAVE_HI_SCORES
                 
                 LDA #GS_GAME_OVER
@@ -278,20 +215,15 @@ KEYBOARD_INTERRUPT_PS2
 ; ****************************************************************
 ; ****************************************************************
 SOF_INTERRUPT
-                ; empty the keyboard buffer, just in case
-        ; EMPTY_KBD_BUFFER
-                ; LOAD_KBD_STATUS_PORT
-                
-                ; BIT #1
-                ; BEQ GS_KBD_NOT_FULL
-                ; LOAD_KBD_INPT_BUF
-                ; BRA EMPTY_KBD_BUFFER
-        ; GS_KBD_NOT_FULL
-                JSR HANDLE_JOYSTICK
-                
+            
                 LDA GAME_STATE  ; The SOF is still getting called, even when masked
                 BNE CHK_GAME_RESTARTING
                 
+                CMP #GS_LINE_BONUS
+                BEQ SOF_DONE
+                
+                JSR KEYBOARD_INTERRUPT_MATRIX
+                JSR HANDLE_JOYSTICK
                 JSR DISPLAY_BOARD_LOOP
                 BRA SOF_DONE
                 
@@ -347,6 +279,8 @@ SOF_INTERRUPT
                 CMP #GS_INTRO
                 BNE CHK_ENTRY_SCREEN
                 
+                JSR KEYBOARD_INTERRUPT_MATRIX
+                JSR HANDLE_JOYSTICK
                 JSR INTRO_LOOP
 
                 BRA SOF_DONE
@@ -355,6 +289,7 @@ SOF_INTERRUPT
                 CMP #GS_NAME_ENTRY
                 BNE SOF_DONE
                 
+                JSR KEYBOARD_INTERRUPT_MATRIX
                 ; write the user entry
                 LDA #<(TEXT_START + COLUMNS_PER_LINE*16 + 45)
                 STA CURSORPOS
@@ -445,3 +380,290 @@ DEL_CHAR
                 
         D_C_DONE
                 RTS
+                
+                
+COMPLETE_ENTRY
+                ; hide the cursor
+                STZ VKY_CURSOR_CTRL
+                
+                ; replace all _ with space
+        -       LDA HISCORE_OFFSET
+                CMP #6
+                BEQ CE_DONE
+                
+                CLC
+                ADC TEMP_LOCATION
+                
+                TAX
+                LDA #$20
+                STA HI_SCORES,X
+                INC HISCORE_OFFSET
+                BRA - 
+    CE_DONE
+                RTS 
+                
+                
+; ****************************************************************
+;
+;  MATRIX Keyboard Polling Routine
+;
+; ****************************************************************
+KEYBOARD_INTERRUPT_MATRIX
+                LDA KBD_POLL
+                INC A
+                STA KBD_POLL
+                CMP #6
+                BNE KIM_END
+                
+                STZ KBD_POLL
+                
+                LDA #$FF
+                STA VIA1_DDRB    ; allows output on Port B
+                
+                LDA GAME_STATE
+                CMP #GS_NAME_ENTRY
+                BEQ KIM_ENTRY
+                
+                CMP #GS_INTRO
+                BEQ KIM_SPACE
+                
+                LDA #~%0000_0100 ; select line 2, which contain A and D keys
+                STA VIA1_IORB
+                
+                LDA VIA1_IORA
+                BIT #2  ; check if the A key is pressed
+                BNE +
+                
+                JSR MOVE_PIECE_LEFT
+                BRA KIM_END
+                
+         +      BIT #4   ; check if the D key is pressed
+                BNE +
+                
+                JSR MOVE_PIECE_RIGHT
+                BRA KIM_END
+                
+         +      LDA #~%0010_0000 ; select line 5, which contains S
+                STA VIA1_IORB
+                
+                LDA VIA1_IORA
+                BIT #2    ; check if the S key is pressed
+                BNE KIM_SPACE
+                
+                JSR MOVE_PIECE_DOWN
+                BRA KIM_END
+                
+     KIM_SPACE  LDA #~%0001_0000    ; select line 4, which contains SPACE
+                STA VIA1_IORB ; check if the SPACE key is pressed
+                LDA VIA1_IORA
+                BIT #$80
+                BNE KIM_END
+                
+                LDA #SPACE_KEY
+                STA KEYPRESSED
+                
+                LDA GAME_STATE
+                BNE +
+                
+                JSR ROTATE_PIECE
+                BRA KIM_END
+                
+        +       CMP #GS_INTRO
+                BNE KIM_END
+                
+                ; the user has pressed a key change the game state to play
+                LDA #GS_RESTARTING
+                STA GAME_STATE
+                ; this routine calls the DMA - must be done here?
+                JSR CLR_SCREEN
+                
+    KIM_END     LDA #0             ; disable writing to Port B
+                STA VIA1_DDRB
+                RTS
+                
+    KIM_ENTRY
+                LDA #$FF
+                STA VIA1_DDRB    ; allows output on Port B
+                
+                LDX #0
+                LDA #1
+     SCAN_LOOP  STA TEMP_LOCATION
+                EOR #$FF  ; flip all the bits
+                STA VIA1_IORB  ; output the scan line
+                LDA VIA1_IORA
+                EOR #$FF
+                ; if not #0
+                BEQ SCL_X
+      
+                JSR MATRIX_KEY
+                
+                ; for debugging - display the key
+                LDA #<(TEXT_START + 40)
+                STA CURSORPOS
+                LDA #>(TEXT_START + 40)
+                STA CURSORPOS + 1
+                LDA #$50
+                STA CURCOLOR
+                LDA KEYPRESSED
+                PHA
+                JSR DISPLAY_HEX
+                PLA
+                CMP #$F  ; backspace
+                BNE KIM_CHK_RETURN
+                
+                JSR DEL_CHAR
+                BRA KIME_END
+                
+       KIM_CHK_RETURN
+                CMP #$8
+                BNE KIM_OTHER_KEYS
+                
+                JSR COMPLETE_ENTRY
+                
+                BRA KIME_END
+                
+       KIM_OTHER_KEYS
+                ; ignore key codes above $40
+                CMP #$40
+                BGE KIME_END
+                
+                TAX
+                LDA KEYMATRIX_TO_CHAR,X
+                BEQ KIME_END
+                
+                JSR ADD_CHAR
+                BRA KIME_END
+                
+                
+        SCL_X   LDA TEMP_LOCATION
+                ASL A
+                INX
+                CPX #8
+                BNE SCAN_LOOP
+                
+                
+     KIME_END   LDA #0             ; disable writing to Port B
+                STA VIA1_DDRB
+                RTS
+                
+MATRIX_KEY  
+                ; a key is pressed  X *8 + A
+                BIT #1
+                BEQ +
+                LDA #0
+                BRA PBS
+                
+             +  BIT #2
+                BEQ + 
+                LDA #1
+                BRA PBS
+                
+             +  BIT #4
+                BEQ + 
+                LDA #2
+                BRA PBS
+                
+             +  BIT #8
+                BEQ + 
+                LDA #3
+                BRA PBS
+                
+             +  BIT #$10
+                BEQ + 
+                LDA #4
+                BRA PBS
+                
+             +  BIT #$20
+                BEQ + 
+                LDA #5
+                BRA PBS
+                
+             +  BIT #$40
+                BEQ + 
+                LDA #6
+                BRA PBS
+                
+             +  BIT #$80
+                BEQ PBS
+                LDA #7
+        PBS     STA KEYPRESSED
+                TXA
+                ASL A
+                ASL A
+                ASL A
+                CLC
+                ADC KEYPRESSED
+                STA KEYPRESSED
+                RTS
+; **************************************************************************512
+; * Handle Joystick Movements
+; * Remember that the joystick at rest returns $FF.
+; * Poll the joystick 10 times a second.
+; *****************************************************************************
+HANDLE_JOYSTICK
+                LDA JOYSTICK_POLL
+                INC A
+                STA JOYSTICK_POLL
+                CMP #6
+                BNE JS_DONE
+                
+                
+                STZ JOYSTICK_POLL
+                
+                LDA #<(TEXT_START + 5)
+                STA CURSORPOS
+                LDA #>(TEXT_START + 5)
+                STA CURSORPOS + 1
+                LDA #$20
+                STA CURCOLOR
+                
+                ; DEBUG DISPLAY VIA PORT 0
+                LDX MMU_IO_CTRL
+                LDA #0
+                STA MMU_IO_CTRL
+                LDA VIA0_IORB
+                STX MMU_IO_CTRL
+                PHA
+                JSR DISPLAY_HEX
+                PLA
+                ; we don't care about up #1
+                BIT #2 ; down
+                BNE JS_LEFT
+                
+                STZ BUTTON_PRESS
+                JSR MOVE_PIECE_DOWN
+                BRA JS_DONE
+                
+        JS_LEFT
+                BIT #4 ; left
+                BNE JS_RIGHT
+                
+                STZ BUTTON_PRESS
+                JSR MOVE_PIECE_LEFT
+                BRA JS_DONE
+                
+        JS_RIGHT
+                BIT #8 ; right
+                BNE JS_BUTTON
+                
+                STZ BUTTON_PRESS
+                JSR MOVE_PIECE_RIGHT
+                BRA JS_DONE
+                
+        JS_BUTTON
+                BIT #$10 ; button
+                BNE JS_NONE
+                
+                LDA BUTTON_PRESS
+                BNE JS_DONE
+                
+                LDA #1
+                STA BUTTON_PRESS
+                JSR ROTATE_PIECE
+                RTS
+                
+        JS_NONE
+                STZ BUTTON_PRESS
+        JS_DONE
+                RTS
+                
