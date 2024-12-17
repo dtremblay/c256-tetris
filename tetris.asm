@@ -21,28 +21,6 @@
 .include "io_def.asm"
 
 * = $000500
-.include "keyboard_def.asm"
-
-.include "base.asm"
-
-* = $1000
-.include "interrupt_handler.asm"
-
-; ****************************************************
-; *                CONSTANTS
-; ****************************************************
-TARGET_FMX         = 1
-TARGET_U           = 2
-TARGET_F256        = 3
-
-COLUMNS_PER_LINE   = 80
-ROW_PER_PAGE       = 60
-INITIAL_GAME_SPEED = 40
-BOARD_WIDTH        = 12
-BOARD_HEIGHT       = 21
-WALL               = 1
-MIDDLE_POSITION    = 3
-
 ; ****************************************************
 ; *                RESERVED REGISTER AREA
 ; ****************************************************
@@ -67,6 +45,30 @@ GAME_STATE      .byte 4
     GS_NAME_ENTRY   = 5   ;  5 - name entry
 
 LEVEL           .byte 1
+PROGRESS        .byte $FF
+
+; ****************************************************
+; *             KEYBOARD SCAN CODES
+; ****************************************************
+.include "keyboard_def.asm"
+
+* = $1000
+.include "interrupt_handler.asm"
+
+; ****************************************************
+; *                CONSTANTS
+; ****************************************************
+TARGET_FMX         = 1
+TARGET_U           = 2
+TARGET_F256        = 3
+
+COLUMNS_PER_LINE   = 80
+ROW_PER_PAGE       = 60
+INITIAL_GAME_SPEED = 40
+BOARD_WIDTH        = 12
+BOARD_HEIGHT       = 21
+WALL               = 1
+MIDDLE_POSITION    = 3
 
 START_TILEMAP     = (TILEMAP + (40*5 + (40-(BOARD_WIDTH))/2)*2)
 NEXT_PIECE_LOC    = (TILEMAP + (40*15 + 30)*2)
@@ -156,19 +158,14 @@ GAME_START
                 ; reset the VIA to read PORT B
                 LDA #0
                 STA VIA1_DDRB
-                
+
                 JSR LOAD_GAME_ASSETS
+
                 ; read the hi-score list from disk
                 ; JSR ISDOS_INIT
                 ; JSR LOAD_HI_SCORES
                 LDA #GS_INTRO
                 STA GAME_STATE
-                
-                JSR VGM_INIT_TIMERS
-                
-                ; set the display mode to tiles
-                LDA #VKY_Tile_Mode_En + VKY_Bitmap_Mode_En + VKY_Text_Mode_En + VKY_Graph_Mode_En + VKY_Text_Overlay
-                STA VKY_MSTR_CTRL_0
                 
                 ; double y text
                 LDA #4
@@ -178,22 +175,36 @@ GAME_START
                 LDA #RND_ENABLE
                 STA RND_CTRL
                 
+                ; set the display mode to tiles
+                LDA #VKY_Tile_Mode_En + VKY_Bitmap_Mode_En + VKY_Text_Mode_En + VKY_Graph_Mode_En + VKY_Text_Overlay
+                STA VKY_MSTR_CTRL_0
+
                 JSR CLR_SCREEN ; clears the text
                 
-    NEXT_GAME
-                ; DONTWORK : enable the matrix keyboard interrupts in VIA1
-                ;LDA #$FF
-                ;STA VIA0_INTR_FLG  ; clear all flags
-                ;LDA #VIA_IRQ_SET + VIA_IRQ_CA1_EN
-                ;STA VIA1_INTR_REG
+                ; overwrite the MMU slot #7 with RAM and set the IRQ vector
+                LDA $0
+                ORA #$80
+                STA $0
+                LDX #$3F
+                STX $F
+
+                ; set the interrupt vector to IRQ_HANDLER
+                LDA #<IRQ_HANDLER
+                STA $FFFE
+                LDA #>IRQ_HANDLER
+                STA $FFFF
                 
+    NEXT_GAME
+                JSR VGM_INIT_TIMERS
+
                 ; Enable SOF and TIMER0 and PS2 Keyboard
                 ; Joystick interrupts do not work
                 LDA #~(INT0_VKY_SOF | INT0_TIMER_0 | INT0_PS2_KBD)
                 STA INT_MASK_REG0
-                ; DONTWORK Enable F256K Matrix Keyboard interrupts
-                ;LDA #~(INT1_VIA1)
-                ;STA INT_MASK_REG1
+                
+                LDA #$FF
+                STA INT_MASK_REG1
+                STA INT_MASK_REG2
                 
                 LDA GAME_STATE
                 CMP #GS_INTRO
@@ -204,6 +215,7 @@ GAME_START
                 STA PS2_CTRL
                 STZ PS2_CTRL
                 
+
                 ; check the buffer is empty - only do this 10 times
                 LDX #10
         -       LDA PS2_STAT
@@ -212,7 +224,11 @@ GAME_START
                 AND #1
                 BNE -
                 
-        +       JSR DISPLAY_INTRO
+        +       LDA #9
+                STA PROGRESS
+                JSR DISPLAY_INTRO
+                LDA #$A
+                STA PROGRESS
         
                 CLI
                 BRA INFINITE_LOOP
@@ -233,12 +249,16 @@ GAME_START
                 NOP
                 NOP
                 NOP
+                LDA #$B
+                STA PROGRESS
+                
                 LDA GAME_STATE
                 CMP #GS_RESTARTING
                 BNE IL_DONE
 
                 LDA #GS_RUNNING
                 STA GAME_STATE
+                
                 JSR INIT_GAME
                 
                 BRA NEXT_GAME
@@ -262,8 +282,8 @@ CLR_SCREEN
                 
                 LDY #0
         -       LDX #0
-        -       
-                LDA #IO_PAGE3
+               
+        -       LDA #IO_PAGE3
                 STA MMU_IO_CTRL
                 
                 LDA #0
@@ -621,7 +641,7 @@ GET_PIECE_VALUE
 ; *****************************************************************************
 MOVE_PIECE_LEFT
                 LDA GAME_STATE
-                CMP #1 ; user pressed the space bar to restart the game
+                CMP #GS_GAME_OVER      ; ignore joystick movements in GAME_OVER state
                 BEQ MOVE_LEFT_DONE
                 
                 LDA PIECE_X
@@ -646,7 +666,7 @@ MOVE_PIECE_LEFT
 ; *****************************************************************************
 MOVE_PIECE_RIGHT
                 LDA GAME_STATE
-                CMP #1 ; user pressed the space bar to restart the game
+                CMP #GS_GAME_OVER      ; ignore joystick movements in GAME_OVER state
                 BEQ MOVE_RIGHT_DONE
                 
                 LDA PIECE_X
@@ -671,7 +691,7 @@ MOVE_PIECE_RIGHT
 ; *****************************************************************************
 MOVE_PIECE_DOWN
                 LDA GAME_STATE
-                CMP #1 ; user pressed the space bar to restart the game
+                CMP #GS_GAME_OVER     ; ignore joystick movements in GAME_OVER state
                 BEQ MOVE_DOWN_DONE
                 
                 LDA PIECE_Y
@@ -1086,6 +1106,9 @@ DRAW_HI_SCORES
                 LDA MSG_ADDR
                 ADC #10
                 STA MSG_ADDR
+                LDA MSG_ADDR + 1
+                ADC #0
+                STA MSG_ADDR + 1
                 
                 ; calculate the position to write to
                 LDA CURSORPOS
@@ -1296,19 +1319,21 @@ DISPLAY_MSG
 ; * Game Over screen
 ; *****************************************************************************
 GAME_OVER
-                LDA #$0 ; disable the tiles
-                STA VKY_TILEMAP0_CTRL
-                STA VKY_TILEMAP1_CTRL
+                ; disable the tiles
+                STZ VKY_TILEMAP0_CTRL
+                STZ VKY_TILEMAP1_CTRL
                 
                 ; load the game over music
-                LDA #ACT_EDIT + ACT_ED_L0
+                LDA MMU_MEM_CTRL
+                ORA #ACT_EDIT
                 STA MMU_MEM_CTRL
                 
                 LDA #(full_addr(VGM_GAME_OVER_MUSIC) / $2000)
                 STA 8+2  ; store in MMU
                 STA CURRENT_POSITION + 2
                 STA SONG_START + 2
-                LDA #0
+                LDA MMU_MEM_CTRL
+                AND #$7F
                 STA MMU_MEM_CTRL
                 
                 LDA #<(2 * $2000 + (full_addr(VGM_GAME_OVER_MUSIC) % $2000))
@@ -1640,6 +1665,12 @@ INIT_GAME
                 LDA #1
                 STA LEVEL
                 
+                ; Wait until DMA is not busy
+          -     lda DMA_STATUS      
+                and #DMA_STAT_BUSY
+                cmp #DMA_STAT_BUSY
+                beq -
+                
                 ; clear board and tilemap
                 dma_fill_2d 0, BOARD+1, 10, 20, 12
                 dma_fill 0, TILEMAP, 40*30*2
@@ -1651,14 +1682,16 @@ INIT_GAME
                 STA VKY_TILEMAP0_CTRL
                 
                 ; load the play music - switch slot 2 to point the the song start
-                LDA #ACT_EDIT + ACT_ED_L0
+                LDA MMU_MEM_CTRL
+                ORA #ACT_EDIT
                 STA MMU_MEM_CTRL
                 
                 LDA #(VGM_PLAY_MUSIC / $2000)
                 LDA #(full_addr(VGM_PLAY_MUSIC) / $2000)
                 STA SONG_START + 2
                 STA 8+2
-                LDA #0
+                LDA MMU_MEM_CTRL
+                AND #$7F
                 STA MMU_MEM_CTRL
                 
                 ; load the game music - slot 2 should be set to the hi-byte
@@ -1737,38 +1770,69 @@ INTRO_LOOP
 ; *****************************************************************************          
 DISPLAY_INTRO
                 ; disable layer 0
+                LDA #$10
+                STA PROGRESS
+                
                 STZ VKY_TILEMAP0_CTRL 
                 
-                ; switch slot 2 ($4000) to point to the VMG area INTRO MUSIC
-                ; switch slot 5 ($A000) to point to the tiles area $1_0000 (slot 8)
-                LDA #ACT_EDIT + ACT_ED_L0
+                LDA #$11
+                STA PROGRESS
+                
+                LDA MMU_MEM_CTRL
+                ORA #ACT_EDIT
+                ;LDA #ACT_EDIT + ACT_ED_L0
                 STA MMU_MEM_CTRL
+                
+                LDA #$12
+                STA PROGRESS
+                
+                ; switch slot 2 ($4000) to point to the VMG area INTRO MUSIC
                 LDA #(full_addr(VGM_INTRO_MUSIC) / $2000)
                 STA 8+2
                 STA SONG_START + 2
+                
+                LDA #$13
+                STA PROGRESS
+                
+                ; switch slot 5 ($A000) to point to the tiles area $1_0000 (slot 8)
                 LDA #($1_0000 / $2000)
                 STA 8+5
-                LDA #0
+                
+                LDA #$14
+                STA PROGRESS
+                
+                LDA MMU_MEM_CTRL
+                AND #$7F
                 STA MMU_MEM_CTRL
+                
+                LDA #$15
+                STA PROGRESS
                 
                 ; load the intro music - slot 2 should be set to the hi-byte
                 LDA #<(2 * $2000 + (full_addr(VGM_INTRO_MUSIC) % $2000))
                 STA SONG_START
                 LDA #>(2 * $2000 + (full_addr(VGM_INTRO_MUSIC) % $2000))
                 STA SONG_START + 1
-                JSR VGM_SET_SONG_POINTERS
                 
+                LDA #$16
+                STA PROGRESS
+                JSR VGM_SET_SONG_POINTERS
+                LDA #$17
+                STA PROGRESS
                 display_text 29, 23, $70, INTRO_MSG
                 display_text 23, 24, $70, MACHINE_DESIGNER_MSG
                 display_text 23, 25, $70, SOFTWARE_DEV_MSG
                 display_text 29, 27, $B0, SPACE_TO_START
-                
+                LDA #$18
+                STA PROGRESS
                 LDA #0
                 STA INTRO_SLIDE_CNT
                 
                 ; enable tile layer 1
                 LDA #VKY_TILEMAP_EN | VKY_TILEMAP_8
                 STA VKY_TILEMAP1_CTRL
+                LDA #$19
+                STA PROGRESS
                 RTS
                 
 ; *****************************************************************************

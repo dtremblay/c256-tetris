@@ -72,11 +72,13 @@ increment_long_addr   .macro
             LDA #\4
             STA \1 + 1
             ; switch the slot to the next area in memory
-            LDA #ACT_EDIT + ACT_ED_L0
+            LDA MMU_MEM_CTRL
+            ORA #ACT_EDIT
             STA MMU_MEM_CTRL
             
             INC 8+2  ; slot 2
-            LDA #0
+            LDA MMU_MEM_CTRL
+            AND #$7F
             STA MMU_MEM_CTRL
 
     skip_n_done
@@ -179,9 +181,10 @@ AY8910
             LDA (CURRENT_POSITION)
             increment_long_addr CURRENT_POSITION,1,>SLOT3,>SLOT2
             CMP #0 ; Register 0 fine
-            BNE AY_R1
+            BEQ +
+            JMP AY_R1
             
-            LDA AY_3_8910_A
+       +    LDA AY_3_8910_A
             CMP #8
             BLT R0_FINE
             
@@ -232,9 +235,10 @@ AY8910
             JMP VGM_WRITE_REGISTER
             
     AY_R2   CMP #2
-            BNE AY_R3
+            BEQ +
+            JMP AY_R3
             
-            LDA AY_3_8910_B
+       +    LDA AY_3_8910_B
             CMP #8
             BLT R1_FINE
             
@@ -283,9 +287,10 @@ AY8910
             JMP VGM_WRITE_REGISTER
             
     AY_R4   CMP #4
-            BNE AY_R5
+            BEQ +
+            JMP AY_R5
             
-            LDA AY_3_8910_C
+      +     LDA AY_3_8910_C
             CMP #8
             BLT R2_FINE
             
@@ -655,11 +660,13 @@ WAIT_COMMANDS
             STA CURRENT_POSITION + 1
             
             ; change the slot 2 reference
-            LDA #ACT_EDIT + ACT_ED_L0
+            LDA MMU_MEM_CTRL
+            ORA #ACT_EDIT
             STA MMU_MEM_CTRL
             LDA LOOP_OFFSET_REG + 2
             STA 8+2
-            LDA #0
+            LDA MMU_MEM_CTRL
+            AND #$7F
             STA MMU_MEM_CTRL
           
             JMP VGM_LOOP_DONE
@@ -815,20 +822,15 @@ VGM_SET_SONG_POINTERS
 
 ; the game uses two timers:
 ; * timer0 is for the music
-; * timer1 is for the effects
 VGM_INIT_TIMERS
-            LDA #5
+            LDA #$A
             STA TIMER0_CMP
-            STA TIMER1_CMP
-            LDA #5
+            LDA #$A
             STA TIMER0_CMP+1
-            STA TIMER1_CMP+1
-            LDA #5
+            LDA #$A
             STA TIMER0_CMP+2
-            STA TIMER1_CMP+2
             
             restart_timer0
-            ;restart_timer1
 
             RTS
             

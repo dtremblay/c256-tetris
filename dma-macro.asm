@@ -35,6 +35,14 @@ wait_dma:   ; Wait until DMA is not busy
             and #DMA_STAT_BUSY
             cmp #DMA_STAT_BUSY
             beq wait_dma
+            
+            ; these seem to make DMA more stable
+            nop
+            nop
+            nop
+            nop
+            nop
+            nop
 
             ; Turn off the DMA engine
             stz DMA_CTRL        

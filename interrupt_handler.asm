@@ -34,6 +34,7 @@ IRQ_HANDLER
 ; Second Block of 8 Interrupts
 CHECK_PENDING_REG1
                 LDA INT_PENDING_REG1
+                STA INT_PENDING_REG1
                 BEQ CHECK_PENDING_REG2   ; BEQ EXIT_IRQ_HANDLE
 ; Keyboard Interrupt
                 ;check_irq_bit INT_PENDING_REG1, INT1_VIA0, JOYSTICK_INTERRUPT
@@ -161,52 +162,11 @@ KEYBOARD_INTERRUPT_PS2
 
                 ; TODO - JSR SAVE_HI_SCORES
                 
-                LDA #GS_GAME_OVER
-                STA GAME_STATE
-                
-                ; ERASE the ENTRY text
-                LDA MMU_IO_CTRL
-                PHA
-
-                LDA #IO_PAGE2
-                STA MMU_IO_CTRL
-                
-                LDA #<(TEXT_START + COLUMNS_PER_LINE*16 + 28)
-                STA CURSORPOS
-                LDA #>(TEXT_START + COLUMNS_PER_LINE*16 + 28)
-                STA CURSORPOS + 1
-                
-                LDY #9 ; delete the bottom 9 lines
-        ER_NEXT_LINE
-                LDX #30 ; the number of characters to delete
-                LDA #0
-                
-        ERASE_ENTRY_LOOP
-                STA (CURSORPOS)
-                INC CURSORPOS
-                BNE +
-                INC CURSORPOS + 1 
-           +    DEX
-                BNE ERASE_ENTRY_LOOP
-                
-                ; clear the next line
-                CLC
-                LDA CURSORPOS
-                ADC #COLUMNS_PER_LINE - 30
-                STA CURSORPOS
-                BCC +
-                INC CURSORPOS + 1
-                
-         +      DEY
-                BNE ER_NEXT_LINE
-                
-                PLA
-                STA MMU_IO_CTRL
+                JSR FINISH_ENTRY_SCREEN
                 
     DONE_ENTRY
                 RTS
                 
-
 
 ; ****************************************************************
 ; ****************************************************************
@@ -232,7 +192,7 @@ SOF_INTERRUPT
                 BNE CHK_GAME_OVER
 
                 
-                
+                ; ?? WHAT DO WE DO HERE ??
                 BRA SOF_DONE
                 
                 
@@ -240,6 +200,7 @@ SOF_INTERRUPT
                 CMP #GS_GAME_OVER
                 BNE CHK_REMOVE_LINES
                 
+                JSR KEYBOARD_INTERRUPT_MATRIX
                 ; count 60 ticks for 1 second
                 LDA GAME_OVER_TICK
                 INC A
@@ -288,23 +249,26 @@ SOF_INTERRUPT
     CHK_ENTRY_SCREEN
                 CMP #GS_NAME_ENTRY
                 BNE SOF_DONE
-                
-                JSR KEYBOARD_INTERRUPT_MATRIX
+
                 ; write the user entry
                 LDA #<(TEXT_START + COLUMNS_PER_LINE*16 + 45)
                 STA CURSORPOS
                 LDA #>(TEXT_START + COLUMNS_PER_LINE*16 + 45)
                 STA CURSORPOS + 1
-                LDA #$70
+                LDA #$A0
                 STA CURCOLOR
-                LDA #>HI_SCORES
-                STA MSG_ADDR + 1
+                
                 CLC
                 LDA #<HI_SCORES
                 ADC TEMP_LOCATION
                 STA MSG_ADDR
+                LDA #>HI_SCORES
+                ADC #0   ; if there was a carry, then add it
+                STA MSG_ADDR + 1
 
                 JSR DISPLAY_MSG
+                
+                JSR KEYBOARD_INTERRUPT_MATRIX
                 
     SOF_DONE
                 RTS
@@ -319,6 +283,11 @@ TIMER0_INTERRUPT
                 JSR VGM_WRITE_REGISTER
                 RTS
                 
+; ******************************
+; * The timers in the FMX/U/U+ machines were identical.
+; * In the F256, timer1 has a 60Hz clock ... 
+; * Cannot be used for music.
+; ******************************
 TIMER1_INTERRUPT
                 ; LDA EFFECT_PLAY
                 ; BEQ NO_EFFECT
@@ -381,7 +350,10 @@ DEL_CHAR
         D_C_DONE
                 RTS
                 
-                
+; ****************************************************************  
+; Called when the user presses <RETURN> in hi-score name entry.
+; This routine adds spaces after the cursor, up to 6 characters.
+; ****************************************************************  
 COMPLETE_ENTRY
                 ; hide the cursor
                 STZ VKY_CURSOR_CTRL
@@ -402,6 +374,54 @@ COMPLETE_ENTRY
     CE_DONE
                 RTS 
                 
+; ****************************************************************
+; * This is called after COMPLETE_ENTRY. 
+; * Set the game state to GAME_OVER, which will start the countdown.
+; * Delete all user entry messages.
+; ****************************************************************
+FINISH_ENTRY_SCREEN
+                LDA #GS_GAME_OVER
+                STA GAME_STATE
+                
+                ; ERASE the ENTRY text
+                LDA MMU_IO_CTRL
+                PHA
+
+                LDA #IO_PAGE2
+                STA MMU_IO_CTRL
+                
+                LDA #<(TEXT_START + COLUMNS_PER_LINE*16 + 28)
+                STA CURSORPOS
+                LDA #>(TEXT_START + COLUMNS_PER_LINE*16 + 28)
+                STA CURSORPOS + 1
+                
+                LDY #9 ; delete the bottom 9 lines
+        ER_NEXT_LINE
+                LDX #30 ; the number of characters to delete
+                LDA #0
+                
+        ERASE_ENTRY_LOOP
+                STA (CURSORPOS)
+                INC CURSORPOS
+                BNE +
+                INC CURSORPOS + 1 
+           +    DEX
+                BNE ERASE_ENTRY_LOOP
+                
+                ; clear the next line
+                CLC
+                LDA CURSORPOS
+                ADC #COLUMNS_PER_LINE - 30
+                STA CURSORPOS
+                BCC +
+                INC CURSORPOS + 1
+                
+         +      DEY
+                BNE ER_NEXT_LINE
+                
+                PLA
+                STA MMU_IO_CTRL
+                RTS
                 
 ; ****************************************************************
 ;
@@ -412,7 +432,7 @@ KEYBOARD_INTERRUPT_MATRIX
                 LDA KBD_POLL
                 INC A
                 STA KBD_POLL
-                CMP #6
+                CMP #8
                 BNE KIM_END
                 
                 STZ KBD_POLL
@@ -431,6 +451,7 @@ KEYBOARD_INTERRUPT_MATRIX
                 STA VIA1_IORB
                 
                 LDA VIA1_IORA
+                BEQ KIM_END      ; check if the matrix keyboard is installed
                 BIT #2  ; check if the A key is pressed
                 BNE +
                 
@@ -456,6 +477,7 @@ KEYBOARD_INTERRUPT_MATRIX
      KIM_SPACE  LDA #~%0001_0000    ; select line 4, which contains SPACE
                 STA VIA1_IORB ; check if the SPACE key is pressed
                 LDA VIA1_IORA
+                BEQ KIM_END      ; check if the matrix keyboard is installed
                 BIT #$80
                 BNE KIM_END
                 
@@ -469,10 +491,12 @@ KEYBOARD_INTERRUPT_MATRIX
                 BRA KIM_END
                 
         +       CMP #GS_INTRO
+                BEQ +
+                CMP #GS_GAME_OVER
                 BNE KIM_END
                 
                 ; the user has pressed a key change the game state to play
-                LDA #GS_RESTARTING
+        +       LDA #GS_RESTARTING
                 STA GAME_STATE
                 ; this routine calls the DMA - must be done here?
                 JSR CLR_SCREEN
@@ -487,10 +511,11 @@ KEYBOARD_INTERRUPT_MATRIX
                 
                 LDX #0
                 LDA #1
-     SCAN_LOOP  STA TEMP_LOCATION
+     SCAN_LOOP  STA TEMP_LOCATION+1
                 EOR #$FF  ; flip all the bits
                 STA VIA1_IORB  ; output the scan line
                 LDA VIA1_IORA
+                BEQ SCL_X      ; check if the matrix keyboard is installed
                 EOR #$FF
                 ; if not #0
                 BEQ SCL_X
@@ -520,6 +545,10 @@ KEYBOARD_INTERRUPT_MATRIX
                 
                 JSR COMPLETE_ENTRY
                 
+                ; TODO Save scores
+                
+                JSR FINISH_ENTRY_SCREEN
+                
                 BRA KIME_END
                 
        KIM_OTHER_KEYS
@@ -535,7 +564,7 @@ KEYBOARD_INTERRUPT_MATRIX
                 BRA KIME_END
                 
                 
-        SCL_X   LDA TEMP_LOCATION
+        SCL_X   LDA TEMP_LOCATION+1
                 ASL A
                 INX
                 CPX #8

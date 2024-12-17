@@ -1,10 +1,12 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <!--Export of Watch List for C256 Foenix IDE-->
 <watches>
+	<watch address="00DE08" label="ADDER_A" />
+	<watch address="00DE0C" label="ADDER_B" />
+	<watch address="00DE18" label="ADDER_RES" />
+	<watch address="00001E" label="CURCOLOR" />
 	<watch address="000017" label="CURSORPOS" />
-	<watch address="000060" label="DEL_LINE_PTR" />
-	<watch address="000062" label="ROT_VAL" />
-	<watch address="000063" label="ROT_VAL2" />
-	<watch address="000064" label="LINE_CNTR" />
-	<watch address="160139" label="SCORE" />
+	<watch address="00305A" label="HI_SCORES" />
+	<watch address="000074" label="LINE_COUNTER" />
+	<watch address="0026FA" label="TILEMAP" />
 </watches>
